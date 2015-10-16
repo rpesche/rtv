@@ -62,6 +62,8 @@ def main():
     else:
         logging.root.addHandler(logging.NullHandler())
 
+    config.history = config.load_history()
+
     try:
         print('Connecting...')
         reddit = praw.Reddit(user_agent=AGENT.format(version=__version__))
@@ -83,6 +85,7 @@ def main():
     except KeyboardInterrupt:
         pass
     finally:
+        config.save_history(config.history)
         # Ensure sockets are closed to prevent a ResourceWarning
         reddit.handler.http.close()
         # Explicitly close file descriptors opened by Tornado's IOLoop

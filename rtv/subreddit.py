@@ -1,10 +1,10 @@
 import curses
 import time
 import logging
-import atexit
 
 import requests
 
+from . import config
 from .exceptions import SubredditError, AccountError
 from .page import BasePage, Navigator, BaseController
 from .submission import SubmissionPage
@@ -12,20 +12,11 @@ from .subscription import SubscriptionPage
 from .content import SubredditContent
 from .helpers import open_browser, open_editor, strip_subreddit_url
 from .docs import SUBMISSION_FILE
-from .history import load_history, save_history
 from .curses_helpers import (Color, LoadScreen, add_line, get_arrow, get_gold,
                              show_notification, prompt_input)
 
-__all__ = ['history', 'SubredditController', 'SubredditPage']
+__all__ = ['SubredditController', 'SubredditPage']
 _logger = logging.getLogger(__name__)
-history = load_history()
-
-
-@atexit.register
-def save_links():
-    global history
-    save_history(history)
-
 
 class SubredditController(BaseController):
     character_map = {}
@@ -108,8 +99,7 @@ class SubredditPage(BasePage):
         page = SubmissionPage(self.stdscr, self.reddit, self.oauth, url=data['permalink'])
         page.loop()
         if data['url_type'] == 'selfpost':
-            global history
-            history.add(data['url_full'])
+            config.history.add(data['url_full'])
 
     @SubredditController.register(curses.KEY_ENTER, 10, 'o')
     def open_link(self):
@@ -117,8 +107,7 @@ class SubredditPage(BasePage):
         data = self.content.get(self.nav.absolute_index)
 
         url = data['url_full']
-        global history
-        history.add(url)
+        config.history.add(url)
         if data['url_type'] in ['x-post', 'selfpost']:
             page = SubmissionPage(self.stdscr, self.reddit, self.oauth, url=url)
             page.loop()
@@ -200,7 +189,7 @@ class SubredditPage(BasePage):
 
         row = n_title + offset
         if row in valid_rows:
-            seen = (data['url_full'] in history)
+            seen = (data['url_full'] in config.history)
             link_color = Color.MAGENTA if seen else Color.BLUE
             attr = curses.A_UNDERLINE | link_color
             add_line(win, u'{url}'.format(**data), row, 1, attr)
