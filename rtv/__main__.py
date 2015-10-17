@@ -36,7 +36,6 @@ def main():
     locale.setlocale(locale.LC_ALL, '')
 
     # Set the terminal title
-    # TODO: Need to clear the title when the program exits
     title = 'rtv {0}'.format(__version__)
     sys.stdout.write("\x1b]2;{0}\x07".format(title))
 
@@ -50,10 +49,12 @@ def main():
         if getattr(args, key, None) is None:
             setattr(args, key, val)
 
-    if args.ascii:
-        config.unicode = False
-    if not args.persistent:
-        config.persistent = False
+    config.history = config.load_history()
+    if args.ascii is not None:
+        config.unicode = args.ascii
+    if args.persistent is not None:
+        config.persistent = args.persistent
+
     if args.clear_auth:
         config.clear_refresh_token()
 
@@ -61,8 +62,6 @@ def main():
         logging.basicConfig(level=logging.DEBUG, filename=args.log)
     else:
         logging.root.addHandler(logging.NullHandler())
-
-    config.history = config.load_history()
 
     try:
         print('Connecting...')
