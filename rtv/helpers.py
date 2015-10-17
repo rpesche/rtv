@@ -1,6 +1,7 @@
 import sys
 import os
 import curses
+import codecs
 import webbrowser
 import subprocess
 from datetime import datetime
@@ -52,7 +53,7 @@ def clean(string, n_cols=None):
         return string
 
 
-def open_editor(data=''):
+def open_editor(data=u''):
     """
     Open a temporary file using the system's default editor.
 
@@ -62,7 +63,7 @@ def open_editor(data=''):
     """
 
     with NamedTemporaryFile(prefix='rtv-', suffix='.txt', mode='wb') as fp:
-        fp.write(clean(data))
+        fp.write(codecs.encode(data, 'utf-8'))
         fp.flush()
         editor = os.getenv('RTV_EDITOR') or os.getenv('EDITOR') or 'nano'
 
@@ -76,8 +77,8 @@ def open_editor(data=''):
         # Open a second file object to read. This appears to be necessary in
         # order to read the changes made by some editors (gedit). w+ mode does
         # not work!
-        with open(fp.name) as fp2:
-            text = ''.join(line for line in fp2 if not line.startswith('#'))
+        with codecs.open(fp.name, 'rb', 'utf-8') as fp2:
+            text = u''.join(line for line in fp2 if not line.startswith('#'))
             text = text.rstrip()
 
     return text
