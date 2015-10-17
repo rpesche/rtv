@@ -51,7 +51,7 @@ def main():
 
     config.history = config.load_history()
     if args.ascii is not None:
-        config.unicode = args.ascii
+        config.unicode = not args.ascii
     if args.persistent is not None:
         config.persistent = args.persistent
 

@@ -79,14 +79,14 @@ def build_parser():
     return parser
 
 
-def load_config():
+def load_config(filename=CONFIG):
     """
     Attempt to load settings from the local config file.
     """
 
     config = configparser.ConfigParser()
-    if os.path.exists(CONFIG):
-        config.read(CONFIG)
+    if os.path.exists(filename):
+        config.read(filename)
 
     config_dict = {}
     if config.has_section('rtv'):
@@ -111,7 +111,7 @@ def load_refresh_token(filename=TOKEN):
 
 
 def save_refresh_token(token, filename=TOKEN):
-    filepath = os.path.abspath(filename)
+    filepath = os.path.basename(filename)
     if not os.path.exists(filepath):
         os.makedirs(filepath)
     with open(filename, 'w+') as fp:
@@ -131,7 +131,7 @@ def load_history(filename=HISTORY):
 
 
 def save_history(history, filename=HISTORY):
-    filepath = os.path.abspath(filename)
+    filepath = os.path.basename(filename)
     if not os.path.exists(filepath):
         os.makedirs(filepath)
     with codecs.open(filename, 'w+', encoding='utf-8') as fp:
