@@ -4,7 +4,8 @@ import praw
 import requests
 import re
 
-from .exceptions import SubmissionError, SubredditError, SubscriptionError, AccountError
+from .exceptions import (SubmissionError, SubredditError, SubscriptionError,
+                         AccountError)
 from .helpers import humanize_timestamp, wrap_text, strip_subreddit_url
 
 __all__ = ['SubredditContent', 'SubmissionContent', 'SubscriptionContent']
@@ -112,7 +113,8 @@ class BaseContent(object):
                   "selfpost" or "x-post" or a link.
         """
 
-        reddit_link = re.compile("https?://(www\.)?(np\.)?redd(it\.com|\.it)/r/.*")
+        reddit_link = re.compile(
+            "https?://(www\.)?(np\.)?redd(it\.com|\.it)/r/.*")
         author = getattr(sub, 'author', '[deleted]')
         name = getattr(author, 'name', '[deleted]')
         flair = getattr(sub, 'link_flair_text', '')
@@ -323,7 +325,7 @@ class SubredditContent(BaseContent):
             raise SubredditError('Unrecognized order "%s"' % order)
 
         if name == 'me':
-            if not reddit.is_logged_in():
+            if not reddit.is_oauth_session():
                 raise AccountError('Could not access user account')
             elif order:
                 submissions = reddit.user.get_submitted(sort=order)

@@ -2,9 +2,10 @@
 RTV: Reddit Terminal Viewer
 ===========================
 
-RTV is an application that allows you to view and interact with reddit from your terminal. It is compatible with *most* terminal emulators on Linux and OSX.
+RTV is an application that allows you to view and interact with reddit from your terminal.
+It is compatible with *most* terminal emulators on Linux and OSX.
 
-.. image:: http://i.imgur.com/W1hxqCt.png
+.. image:: http://i.imgur.com/xpOEi1E.png
 
 RTV is built in **python** using the **curses** library.
 
@@ -17,6 +18,7 @@ RTV is built in **python** using the **curses** library.
 * `Installation`_
 * `Usage`_
 * `Configuration`_
+* `FAQ`_
 * `Changelog`_
 * `Contributors`_
 * `License`_
@@ -37,7 +39,7 @@ Or clone the repository
 
    $ git clone https://github.com/michael-lazar/rtv.git
    $ cd rtv
-   $ sudo python setup.py install
+   $ sudo python3 setup.py install
 
 The installation will place a script in the system path
 
@@ -45,6 +47,8 @@ The installation will place a script in the system path
 
    $ rtv
    $ rtv --help
+
+See the `FAQ`_ for more information on common installation problems
 
 =====
 Usage
@@ -67,7 +71,7 @@ Basic Commands
 :``r`` or ``F5``: Refresh page content
 :``u``: Log in or switch accounts
 :``?``: Show the help screen
-:``q``: Quit
+:``q``/``Q``: Quit/Force quit
 
 ----------------------
 Authenticated Commands
@@ -148,7 +152,7 @@ If you prefer to stay in the terminal, use ``$BROWSER`` to specify a console-bas
 Authentication
 --------------
 
-RTV use OAuth to facilitate logging into your reddit user account [#]_. The login process follows these steps:
+RTV uses OAuth to facilitate logging into your reddit user account [#]_. The login process follows these steps:
 
 1. You initiate a login by pressing the ``u`` key.
 2. You're redirected to a webbrowser where reddit will ask you to login and authorize RTV.
@@ -197,15 +201,30 @@ Example initial config:
 FAQ
 ===
 
-How do I run the code directly using python?
-  This project is structured to be run as a python *module*. This means that in order to resolve imports you need to launch using python's ``-m`` flag. This method works for all versions of python. Follow the example below, which assumes that you have cloned the repository into the directory **~/rtv_project**.
+Why am I getting an error during installation/when launching rtv?
+  If your distro ships with an older version of python 2.7 or python-requests,
+  you may experience SSL errors or other package incompatibilities. The
+  easiest way to fix this is to install rtv using python 3. If you
+  don't already have pip3, see http://stackoverflow.com/a/6587528 for setup
+  instructions. Then do
 
   .. code-block:: bash
-   
-    $ cd ~/rtv_project
-    $ python2 -m rtv
-    $ python3 -m rtv
 
+    $ sudo pip uninstall rtv
+    $ sudo pip3 install -U rtv
+
+How do I run the repository code directly?
+  This project is structured to be run as a python *module*. This means that in
+  order to resolve imports you need to launch using python's ``-m`` flag.
+  This method works for all versions of python. See the example below, which
+  assumes that you have cloned the repository into the directory
+  **~/rtv_project**.
+
+  .. code-block:: bash
+
+    $ cd ~/rtv_project
+    $ python3 -m pip install -r requirements.py3.txt
+    $ python3 -m rtv
 
 =========
 Changelog
@@ -225,7 +244,7 @@ License
 Please see `LICENSE <https://github.com/michael-lazar/rtv/blob/master/LICENSE>`_.
 
 
-.. |python| image:: https://img.shields.io/badge/python-2.7%2C%203.4-blue.svg?style=flat-square
+.. |python| image:: https://img.shields.io/badge/python-2.7%2C%203.5-blue.svg?style=flat-square
     :target: https://pypi.python.org/pypi/rtv/
     :alt: Supported Python versions
 

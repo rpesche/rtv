@@ -1,6 +1,4 @@
 import curses
-import sys
-import time
 import logging
 
 from .content import SubscriptionContent
@@ -10,8 +8,10 @@ from .curses_helpers import (Color, LoadScreen, add_line)
 __all__ = ['SubscriptionController', 'SubscriptionPage']
 _logger = logging.getLogger(__name__)
 
+
 class SubscriptionController(BaseController):
     character_map = {}
+
 
 class SubscriptionPage(BasePage):
 
@@ -34,17 +34,23 @@ class SubscriptionPage(BasePage):
             self.controller.trigger(cmd)
 
     @SubscriptionController.register(curses.KEY_F5, 'r')
-    def refresh_content(self):
+    def refresh_content(self, order=None):
         "Re-download all subscriptions and reset the page index"
 
-        self.content = SubscriptionContent.from_user(self.reddit, self.loader)
-        self.nav = Navigator(self.content.get)
+        if order:
+            # reddit.get_my_subreddits() does not support sorting by order
+            curses.flash()
+        else:
+            self.content = SubscriptionContent.from_user(self.reddit,
+                                                         self.loader)
+            self.nav = Navigator(self.content.get)
 
     @SubscriptionController.register(curses.KEY_ENTER, 10, curses.KEY_RIGHT)
     def store_selected_subreddit(self):
         "Store the selected subreddit and return to the subreddit page"
 
-        self.selected_subreddit_data = self.content.get(self.nav.absolute_index)
+        self.selected_subreddit_data = self.content.get(
+            self.nav.absolute_index)
         self.active = False
 
     @SubscriptionController.register(curses.KEY_LEFT, 'h', 's')

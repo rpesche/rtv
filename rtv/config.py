@@ -47,8 +47,9 @@ oauth_client_id = 'E2oEtRQfdfAfNQ'
 oauth_client_secret = 'praw_gapfill'
 oauth_redirect_uri = 'http://127.0.0.1:65000/'
 oauth_redirect_port = 65000
-oauth_scope = ['edit', 'history', 'identity', 'mysubreddits', 'privatemessages',
-               'read', 'report', 'save', 'submit', 'subscribe', 'vote']
+oauth_scope = ['edit', 'history', 'identity', 'mysubreddits',
+               'privatemessages', 'read', 'report', 'save', 'submit',
+               'subscribe', 'vote']
 
 
 def build_parser():
