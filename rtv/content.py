@@ -1,15 +1,10 @@
-import logging
-
+import re
 import praw
 import requests
-import re
 
+from .helpers import humanize_timestamp, wrap_text, strip_subreddit_url
 from .exceptions import (SubmissionError, SubredditError, SubscriptionError,
                          AccountError)
-from .helpers import humanize_timestamp, wrap_text, strip_subreddit_url
-
-__all__ = ['SubredditContent', 'SubmissionContent', 'SubscriptionContent']
-_logger = logging.getLogger(__name__)
 
 
 class BaseContent(object):
@@ -114,7 +109,7 @@ class BaseContent(object):
         """
 
         reddit_link = re.compile(
-            "https?://(www\.)?(np\.)?redd(it\.com|\.it)/r/.*")
+            'https?://(www\.)?(np\.)?redd(it\.com|\.it)/r/.*')
         author = getattr(sub, 'author', '[deleted]')
         name = getattr(author, 'name', '[deleted]')
         flair = getattr(sub, 'link_flair_text', '')

@@ -9,19 +9,22 @@ from six.moves import configparser
 from . import docs, __version__
 
 HOME = os.path.expanduser('~')
+PACKAGE = os.path.dirname(__file__)
 XDG_HOME = os.getenv('XDG_CONFIG_HOME', os.path.join(HOME, '.config'))
 CONFIG = os.path.join(XDG_HOME, 'rtv', 'rtv.cfg')
 TOKEN = os.path.join(XDG_HOME, 'rtv', 'refresh-token')
 HISTORY = os.path.join(XDG_HOME, 'rtv', 'history.log')
+TEMPLATE = os.path.join(PACKAGE, 'templates')
+
 
 def build_parser():
+
     parser = argparse.ArgumentParser(
         prog='rtv', description=docs.SUMMARY,
         epilog=docs.CONTROLS+docs.HELP,
         formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument(
-        '-V', '--version', action='version', version='rtv '+__version__,
-    )
+        '-V', '--version', action='version', version='rtv '+__version__)
     parser.add_argument(
         '-s', dest='subreddit',
         help='name of the subreddit that will be opened on start')
@@ -42,13 +45,15 @@ def build_parser():
         help='Remove any saved OAuth tokens before starting')
     return parser
 
+
 class OrderedSet(object):
     """
     A simple implementation of an ordered set. A set is used to check
     for membership, and a list is used to maintain ordering.
     """
 
-    def __init__(self, elements=[]):
+    def __init__(self, elements=None):
+        elements = elements or []
         self._set = set(elements)
         self._list = elements
 
@@ -65,44 +70,67 @@ class OrderedSet(object):
         self._set.add(item)
         self._list.append(item)
 
-class Config(dict):
 
-    def __init__(self, **kwargs):
+class Config(object):
 
-        self.oauth_token = None
+    DEFAULT = {
+        'ascii': False,
+        'persistent': True,
+        'clear_auth': False,
+        'log': None,
+        'link': None,
+        'subreddit': 'front',
+        # https://github.com/reddit/reddit/wiki/OAuth2
+        # Client ID is of type "installed app" and the secret should be empty
+        'oauth_client_id': 'E2oEtRQfdfAfNQ',
+        'oauth_client_secret': 'praw_gapfill',
+        'oauth_redirect_uri': 'http://127.0.0.1:65000/',
+        'oauth_redirect_port': 65000,
+        'oauth_scope': [
+            'edit', 'history', 'identity', 'mysubreddits', 'privatemessages',
+            'read', 'report', 'save', 'submit', 'subscribe', 'vote'],
+        'template_path': TEMPLATE,
+    }
+
+    def __init__(self,
+                 config_file=CONFIG,
+                 history_file=HISTORY,
+                 token_file=TOKEN,
+                 **kwargs):
+
+        self.config_file = config_file
+        self.history_file = history_file
+        self.token_file = token_file
+        self.config = kwargs
+
+        # `refresh_token` and `history` are saved/loaded at separate locations,
+        # so they are treated differently from the rest of the config options.
+        self.refresh_token = None
         self.history = OrderedSet()
-        self.update({
-            'config_filename': CONFIG,
-            'history_filename': HISTORY,
-            'token_filename': TOKEN,
-            'ascii': False,
-            'persistent': True,
-            'clear_auth': False,
-            # https://github.com/reddit/reddit/wiki/OAuth2
-            # Client ID is of type "installed app" and the secret should be empty
-            'oauth_client_id': 'E2oEtRQfdfAfNQ',
-            'oauth_client_secret': 'praw_gapfill',
-            'oauth_redirect_uri': 'http://127.0.0.1:65000/',
-            'oauth_redirect_port': 65000,
-            'oauth_scope': ['edit', 'history', 'identity', 'mysubreddits',
-                            'privatemessages', 'read', 'report', 'save',
-                            'submit', 'subscribe', 'vote']
-        })
 
-        self.update(kwargs)
+    def __getitem__(self, item):
+        return self.config.get(item, self.DEFAULT[item])
 
-    def load_args(self):
+    def __setitem__(self, key, value):
+        self.config[key] = value
 
+    def __delitem__(self, key):
+        del self.config[key]
+
+    def update(self, other=None, **kwargs):
+        return self.config.update(other, **kwargs)
+
+    def from_args(self):
         parser = build_parser()
-        args = parser.parse_args()
+        args = vars(parser.parse_args())
+        # Filter out argument values that weren't supplied
+        args = {key: val for key, val in args.items() if val is not None}
         self.update(args)
 
-    def load_config(self, filename=None):
-
-        filename = filename or self['config_filename']
+    def from_file(self):
         config = configparser.ConfigParser()
-        if os.path.exists(filename):
-            config.read(filename)
+        if os.path.exists(self.config_file):
+            config.read(self.config_file)
 
         config_dict = {}
         if config.has_section('rtv'):
@@ -118,42 +146,41 @@ class Config(dict):
 
         self.update(config_dict)
 
-    def load_refresh_token(self, filename=None):
+    def load_refresh_token(self):
+        if os.path.exists(self.token_file):
+            with open(self.token_file) as fp:
+                self.refresh_token = fp.read().strip()
+        else:
+            self.refresh_token = None
 
-        filename = filename or self['token_filename']
-        if os.path.exists(filename):
-            with open(filename) as fp:
-                return fp.read().strip()
-        return None
+    def save_refresh_token(self):
+        self._ensure_filepath(self.token_file)
+        with open(self.token_file, 'w+') as fp:
+            fp.write(self.refresh_token)
 
-    def write_refresh_token(self, filename=None):
+    def delete_refresh_token(self):
+        if os.path.exists(self.token_file):
+            os.remove(self.token_file)
+        self.refresh_token = None
 
-        filename = filename or self['token_filename']
-        filepath = os.path.basename(filename)
-        if not os.path.exists(filepath):
-            os.makedirs(filepath)
-        with open(filename, 'w+') as fp:
-            fp.write(self['oauth_token'])
+    def load_history(self):
+        if os.path.exists(self.history_file):
+            with codecs.open(self.history_file, encoding='utf-8') as fp:
+                self.history = OrderedSet([line.strip() for line in fp])
+        else:
+            self.history = OrderedSet()
 
-    def delete_refresh_token(self, filename=None):
-
-        filename = filename or self['refresh_filename']
-        if os.path.exists(filename):
-            os.remove(filename)
-
-    def load_history(self, filename=None):
-
-        filename = filename or self['history_filename']
-        if os.path.exists(filename):
-            with codecs.open(filename, encoding='utf-8') as fp:
-                return OrderedSet([line.strip() for line in fp])
-        return OrderedSet()
-
-    def write_history(self, filename=None):
-
-        filename = filename or self['history_filename']
-        filepath = os.path.basename(filename)
-        if not os.path.exists(filepath):
-            os.makedirs(filepath)
-        with codecs.open(filename, 'w+', encoding='utf-8') as fp:
+    def save_history(self):
+        self._ensure_filepath(self.history_file)
+        with codecs.open(self.history_file, 'w+', encoding='utf-8') as fp:
             fp.writelines(self.history[-200:])
+
+    @staticmethod
+    def _ensure_filepath(filename):
+        """
+        Ensure that the directory exists before trying to write to the file.
+        """
+
+        filepath = os.path.basename(filename)
+        if not os.path.exists(filepath):
+            os.makedirs(filepath)

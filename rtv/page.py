@@ -4,18 +4,15 @@ import six
 import sys
 import logging
 
-import praw.errors
 import requests
 from kitchen.text.display import textual_width
+from praw.errors import APIException, ClientException
 
-from .helpers import open_editor
-from .curses_helpers import (Color, show_notification, show_help, prompt_input,
-                             add_line)
-from .docs import COMMENT_EDIT_FILE, SUBMISSION_FILE
+from .docs import COMMENT_EDIT_FILE, SUBMISSION_FILE, HELP
+from .helpers import open_editor, oauth_required
+from .curses_helpers import Color, CursesHelper
 
-__all__ = ['Navigator', 'BaseController', 'BasePage']
 _logger = logging.getLogger(__name__)
-
 
 class Navigator(object):
     """
@@ -157,9 +154,9 @@ class Navigator(object):
 
 class SafeCaller(object):
 
-    def __init__(self, window):
-        self.window = window
+    def __init__(self, show_notification):
         self.catch = True
+        self.show_notification = show_notification
 
     def __enter__(self):
         return self
@@ -169,20 +166,20 @@ class SafeCaller(object):
         if self.catch:
             if isinstance(e, praw.errors.APIException):
                 message = ['Error: {}'.format(e.error_type), e.message]
-                show_notification(self.window, message)
+                self.show_notification(message)
                 _logger.exception(e)
                 return True
             elif isinstance(e, praw.errors.ClientException):
                 message = ['Error: Client Exception', e.message]
-                show_notification(self.window, message)
+                self.show_notification(message)
                 _logger.exception(e)
                 return True
             elif isinstance(e, requests.HTTPError):
-                show_notification(self.window, ['Unexpected Error'])
+                self.show_notification('Unexpected Error')
                 _logger.exception(e)
                 return True
             elif isinstance(e, requests.ConnectionError):
-                show_notification(self.window, ['Unexpected Error'])
+                self.show_notification('Unexpected Error')
                 _logger.exception(e)
                 return True
 
@@ -191,7 +188,7 @@ class BaseController(object):
     """
     Event handler for triggering functions with curses keypresses.
 
-    Register a keystroke to a class method using the @egister decorator.
+    Register a keystroke to a class method using the @register decorator.
     #>>> @Controller.register('a', 'A')
     #>>> def func(self, *args)
 
@@ -236,7 +233,7 @@ class BaseController(object):
         return wrap
 
 
-class BasePage(object):
+class BasePage(CursesHelper):
     """
     Base terminal viewer incorporates a cursor to navigate content
     """
@@ -244,13 +241,15 @@ class BasePage(object):
     MIN_HEIGHT = 10
     MIN_WIDTH = 20
 
-    def __init__(self, stdscr, reddit, content, oauth, **kwargs):
+    def __init__(self, stdscr, reddit, config, oauth):
 
-        self.stdscr = stdscr
+        super(BasePage, self).__init__(stdscr, config)
+
         self.reddit = reddit
-        self.content = content
         self.oauth = oauth
-        self.nav = Navigator(self.content.get, **kwargs)
+        self.content = None
+        self.nav = None
+        self.active = True
 
         self._header_window = None
         self._content_window = None
@@ -269,7 +268,7 @@ class BasePage(object):
         Prompt to exit the application.
         """
 
-        ch = prompt_input(self.stdscr, "Do you really want to quit? (y/n): ")
+        ch = self.prompt_input('Do you really want to quit? (y/n): ')
         if ch == 'y':
             sys.exit()
         elif ch != 'n':
@@ -281,7 +280,7 @@ class BasePage(object):
 
     @BaseController.register('?')
     def help(self):
-        show_help(self._content_window)
+        self.show_notification(HELP.splitlines())
 
     @BaseController.register('1')
     def sort_content_hot(self):
@@ -324,35 +323,30 @@ class BasePage(object):
         self.clear_input_queue()
 
     @BaseController.register('a')
+    @oauth_required
     def upvote(self):
         data = self.content.get(self.nav.absolute_index)
-        try:
-            if 'likes' not in data:
-                pass
-            elif data['likes']:
-                data['object'].clear_vote()
-                data['likes'] = None
-            else:
-                data['object'].upvote()
-                data['likes'] = True
-        except praw.errors.LoginOrScopeRequired:
-            show_notification(self.stdscr, ['Not logged in'])
+        if 'likes' not in data:
+            pass
+        elif data['likes']:
+            data['object'].clear_vote()
+            data['likes'] = None
+        else:
+            data['object'].upvote()
+            data['likes'] = True
 
     @BaseController.register('z')
+    @oauth_required
     def downvote(self):
         data = self.content.get(self.nav.absolute_index)
-        try:
-            if 'likes' not in data:
-                pass
-            elif data['likes'] or data['likes'] is None:
-                data['object'].downvote()
-                data['likes'] = False
-            else:
-                data['object'].clear_vote()
-                data['likes'] = None
-
-        except praw.errors.LoginOrScopeRequired:
-            show_notification(self.stdscr, ['Not logged in'])
+        if 'likes' not in data:
+            pass
+        elif data['likes'] or data['likes'] is None:
+            data['object'].downvote()
+            data['likes'] = False
+        else:
+            data['object'].clear_vote()
+            data['likes'] = None
 
     @BaseController.register('u')
     def login(self):
@@ -362,24 +356,21 @@ class BasePage(object):
         """
 
         if self.reddit.is_oauth_session():
-            ch = prompt_input(self.stdscr, "Log out? (y/n): ")
+            ch = self.prompt_input('Log out? (y/n): ')
             if ch == 'y':
                 self.oauth.clear_oauth_data()
-                show_notification(self.stdscr, ['Logged out'])
+                self.show_notification('Logged out')
             elif ch != 'n':
                 curses.flash()
         else:
             self.oauth.authorize()
 
     @BaseController.register('d')
+    @oauth_required
     def delete(self):
         """
         Delete a submission or comment.
         """
-
-        if not self.reddit.is_oauth_session():
-            show_notification(self.stdscr, ['Not logged in'])
-            return
 
         data = self.content.get(self.nav.absolute_index)
         if data.get('author') != self.reddit.user.name:
@@ -387,9 +378,9 @@ class BasePage(object):
             return
 
         prompt = 'Are you sure you want to delete this? (y/n): '
-        char = prompt_input(self.stdscr, prompt)
+        char = self.prompt_input(prompt)
         if char != 'y':
-            show_notification(self.stdscr, ['Aborted'])
+            self.show_notification('Aborted')
             return
 
         with self.safe_call as s:
@@ -400,14 +391,11 @@ class BasePage(object):
             self.refresh_content()
 
     @BaseController.register('e')
+    @oauth_required
     def edit(self):
         """
         Edit a submission or comment.
         """
-
-        if not self.reddit.is_oauth_session():
-            show_notification(self.stdscr, ['Not logged in'])
-            return
 
         data = self.content.get(self.nav.absolute_index)
         if data.get('author') != self.reddit.user.name:
@@ -427,7 +415,7 @@ class BasePage(object):
 
         text = open_editor(info)
         if text == content:
-            show_notification(self.stdscr, ['Aborted'])
+            self.show_notification('Aborted')
             return
 
         with self.safe_call as s:
@@ -438,23 +426,15 @@ class BasePage(object):
             self.refresh_content()
 
     @BaseController.register('i')
+    @oauth_required
     def get_inbox(self):
         """
         Checks the inbox for unread messages and displays a notification.
         """
 
-        if not self.reddit.is_oauth_session():
-            show_notification(self.stdscr, ['Not logged in'])
-            return
-
         inbox = len(list(self.reddit.get_unread(limit=1)))
-        try:
-            if inbox > 0:
-                show_notification(self.stdscr, ['New Messages'])
-            elif inbox == 0:
-                show_notification(self.stdscr, ['No New Messages'])
-        except praw.errors.LoginOrScopeRequired:
-            show_notification(self.stdscr, ['Not Logged In'])
+        message = 'New Messages' if inbox > 0 else 'No New Messages'
+        self.show_notification(message)
 
     def clear_input_queue(self):
         """
@@ -481,7 +461,7 @@ class BasePage(object):
             #>>>     s.catch = False
             #>>>     on_success()
         """
-        return SafeCaller(self.stdscr)
+        return SafeCaller(self.show_notification)
 
     def draw(self):
 
@@ -507,16 +487,17 @@ class BasePage(object):
         self._header_window.bkgd(' ', attr)
 
         sub_name = self.content.name.replace('/r/front', 'Front Page')
-        add_line(self._header_window, sub_name, 0, 0)
+        self.add_line(self._header_window, sub_name, 0, 0)
         if self.content.order is not None:
-            add_line(self._header_window, ' [{}]'.format(self.content.order))
+            order = ' [{}]'.format(self.content.order)
+            self.add_line(self._header_window, order)
 
         if self.reddit.user is not None:
             username = self.reddit.user.name
             s_col = (n_cols - textual_width(username) - 1)
             # Only print username if it fits in the empty space on the right
             if (s_col - 1) >= textual_width(sub_name):
-                add_line(self._header_window, username, 0, s_col)
+                self.add_line(self._header_window, username, 0, s_col)
 
         self._header_window.refresh()
 

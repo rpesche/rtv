@@ -4,6 +4,7 @@ import curses
 import codecs
 import webbrowser
 import subprocess
+from functools import wraps
 from datetime import datetime
 from tempfile import NamedTemporaryFile
 
@@ -11,47 +12,18 @@ from tempfile import NamedTemporaryFile
 from kitchen.text.display import wrap, textual_width_chop
 import six
 
-from . import config
 from .exceptions import ProgramError
 
-__all__ = ['open_browser', 'clean', 'wrap_text', 'strip_textpad',
-           'strip_subreddit_url', 'humanize_timestamp', 'open_editor',
-           'check_browser_display']
-
-
-def clean(string, n_cols=None):
+def oauth_required(f):
     """
-    Required reading!
-        http://nedbatchelder.com/text/unipain.html
-
-    Python 2 input string will be a unicode type (unicode code points). Curses
-    will accept unicode if all of the points are in the ascii range. However,
-    if any of the code points are not valid ascii curses will throw a
-    UnicodeEncodeError: 'ascii' codec can't encode character, ordinal not in
-    range(128). If we encode the unicode to a utf-8 byte string and pass that
-    to curses, it will render correctly.
-
-    Python 3 input string will be a string type (unicode code points). Curses
-    will accept that in all cases. However, the n character count in addnstr
-    will not be correct. If code points are passed to addnstr, curses will
-    treat each code point as one character and will not account for wide
-    characters. If utf-8 is passed in, addnstr will treat each 'byte' as a
-    single character.
+    Decorator for Page methods that require the user to be authenticated.
     """
-
-    if n_cols is not None and n_cols <= 0:
-        return ''
-
-    if not config.unicode:
-        if six.PY3 or isinstance(string, unicode):
-            string = string.encode('ascii', 'replace')
-        return string[:n_cols] if n_cols else string
-    else:
-        if n_cols:
-            string = textual_width_chop(string, n_cols)
-        if six.PY3 or isinstance(string, unicode):
-            string = string.encode('utf-8')
-        return string
+    @wraps(f)
+    def wrapped_method(self, *args, **kwargs):
+        if not self.reddit.is_oauth_session():
+            self.show_notification('Not logged in')
+            return
+        return f(self, *args, **kwargs)
 
 
 def open_editor(data=u''):
