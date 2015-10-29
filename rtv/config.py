@@ -32,16 +32,17 @@ def build_parser():
         '-l', dest='link',
         help='full URL of a submission that will be opened on start')
     parser.add_argument(
-        '--ascii', action='store_true',
+        '--ascii', action='store_const', const=True,
         help='enable ascii-only mode')
     parser.add_argument(
         '--log', metavar='FILE', action='store',
         help='log HTTP requests to a file')
     parser.add_argument(
-        '--non-persistent', dest='persistent', action='store_false',
+        '--non-persistent', dest='persistent', action='store_const',
+        const=False,
         help='Forget all authenticated users when the program exits')
     parser.add_argument(
-        '--clear-auth', dest='clear_auth', action='store_true',
+        '--clear-auth', dest='clear_auth', action='store_const', const=True,
         help='Remove any saved OAuth tokens before starting')
     return parser
 
@@ -80,6 +81,7 @@ class Config(object):
         'log': None,
         'link': None,
         'subreddit': 'front',
+        'history_size': 200,
         # https://github.com/reddit/reddit/wiki/OAuth2
         # Client ID is of type "installed app" and the secret should be empty
         'oauth_client_id': 'E2oEtRQfdfAfNQ',
@@ -109,28 +111,29 @@ class Config(object):
         self.history = OrderedSet()
 
     def __getitem__(self, item):
-        return self.config.get(item, self.DEFAULT[item])
+        return self.config.get(item, self.DEFAULT.get(item))
 
     def __setitem__(self, key, value):
         self.config[key] = value
 
     def __delitem__(self, key):
-        del self.config[key]
+        self.config.pop(key, None)
 
-    def update(self, other=None, **kwargs):
-        return self.config.update(other, **kwargs)
+    def update(self, **kwargs):
+        self.config.update(kwargs)
 
     def from_args(self):
         parser = build_parser()
         args = vars(parser.parse_args())
         # Filter out argument values that weren't supplied
         args = {key: val for key, val in args.items() if val is not None}
-        self.update(args)
+        self.update(**args)
 
     def from_file(self):
         config = configparser.ConfigParser()
         if os.path.exists(self.config_file):
-            config.read(self.config_file)
+            with codecs.open(self.config_file, encoding='utf-8') as fp:
+                config.readfp(fp)
 
         config_dict = {}
         if config.has_section('rtv'):
@@ -144,7 +147,7 @@ class Config(object):
         if 'persistent' in config_dict:
             config_dict['persistent'] = config.getboolean('rtv', 'persistent')
 
-        self.update(config_dict)
+        self.update(**config_dict)
 
     def load_refresh_token(self):
         if os.path.exists(self.token_file):
@@ -173,7 +176,12 @@ class Config(object):
     def save_history(self):
         self._ensure_filepath(self.history_file)
         with codecs.open(self.history_file, 'w+', encoding='utf-8') as fp:
-            fp.writelines(self.history[-200:])
+            fp.writelines(u'\n'.join(self.history[-self['history_size']:]))
+
+    def delete_history(self):
+        if os.path.exists(self.history_file):
+            os.remove(self.history_file)
+        self.history = OrderedSet()
 
     @staticmethod
     def _ensure_filepath(filename):

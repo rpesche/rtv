@@ -33,19 +33,19 @@ class CursesHelper(object):
         """
 
         if likes is None:
-            symbol = 'o' if self.config['ascii'] else u'\u2022'
+            symbol = u'o' if self.config['ascii'] else u'\u2022'
             attr = curses.A_BOLD
         elif likes:
-            symbol = '^' if self.config['ascii'] else u'\u25b2'
+            symbol = u'^' if self.config['ascii'] else u'\u25b2'
             attr = curses.A_BOLD | Color.GREEN
         else:
-            symbol = 'v' if self.config['ascii'] else u'\u25bc'
+            symbol = u'v' if self.config['ascii'] else u'\u25bc'
             attr = curses.A_BOLD | Color.RED
         return symbol, attr
 
     def get_gold(self):
 
-        symbol = '*' if self.config['ascii'] else u'\u272A'
+        symbol = u'*' if self.config['ascii'] else u'\u272A'
         attr = curses.A_BOLD | Color.YELLOW
         return symbol, attr
 
