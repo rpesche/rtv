@@ -14,6 +14,7 @@ from .curses_helpers import Color, CursesHelper
 
 _logger = logging.getLogger(__name__)
 
+
 class Navigator(object):
     """
     Handles math behind cursor movement and screen paging.
@@ -39,7 +40,7 @@ class Navigator(object):
 
     @property
     def position(self):
-        return (self.page_index, self.cursor_index, self.inverted)
+        return self.page_index, self.cursor_index, self.inverted
 
     @property
     def absolute_index(self):

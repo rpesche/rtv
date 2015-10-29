@@ -1,17 +1,17 @@
 __all__ = ['AGENT', 'SUMMARY', 'CONTROLS', 'HELP', 'COMMENT_FILE',
            'SUBMISSION_FILE', 'COMMENT_EDIT_FILE']
 
-AGENT = """\
+AGENT = u"""\
 desktop:https://github.com/michael-lazar/rtv:{version}\
 (by /u/civilization_phaze_3)\
 """
 
-SUMMARY = """
+SUMMARY = u"""
 Reddit Terminal Viewer is a lightweight browser for www.reddit.com built into a
 terminal window.
 """
 
-CONTROLS = """
+CONTROLS = u"""
 Controls
 --------
 RTV currently supports browsing both subreddits and individual submissions.
@@ -21,7 +21,7 @@ subreddit. In submission mode you can view the self text for a submission and
 browse comments.
 """
 
-HELP = """
+HELP = u"""
 Basic Commands
   `j/k` or `UP/DOWN`  : Move the cursor up/down
   `m/n` or `PgUp/PgDn`: Jump to the previous/next page

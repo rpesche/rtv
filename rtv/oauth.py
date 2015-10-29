@@ -33,9 +33,9 @@ class OAuthTool(CursesHelper):
 
     def __init__(self, stdscr, reddit, config):
 
-        self.stdscr = stdscr
+        super(OAuthTool, self).__init__(stdscr, config)
+
         self.reddit = reddit
-        self.config = config
         self.http_server = None
 
         # Initialize Tornado webapp

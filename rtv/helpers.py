@@ -9,10 +9,10 @@ from datetime import datetime
 from tempfile import NamedTemporaryFile
 
 # kitchen solves deficiencies in textwrap's handling of unicode characters
-from kitchen.text.display import wrap, textual_width_chop
-import six
+from kitchen.text.display import wrap
 
 from .exceptions import ProgramError
+
 
 def oauth_required(f):
     """
@@ -24,6 +24,7 @@ def oauth_required(f):
             self.show_notification('Not logged in')
             return
         return f(self, *args, **kwargs)
+    return wrapped_method
 
 
 def open_editor(data=u''):

@@ -5,9 +5,12 @@ import curses
 from curses import textpad, ascii
 from contextlib import contextmanager
 
-from .docs import HELP
+import six
+from kitchen.text.display import textual_width_chop
+
 from .helpers import strip_textpad
 from .exceptions import EscapeInterrupt
+
 
 class CursesHelper(object):
 
@@ -30,19 +33,19 @@ class CursesHelper(object):
         """
 
         if likes is None:
-            symbol = 'o' if self.config.ascii else u'\u2022'
+            symbol = 'o' if self.config['ascii'] else u'\u2022'
             attr = curses.A_BOLD
         elif likes:
-            symbol = '^' if self.config.ascii else u'\u25b2'
+            symbol = '^' if self.config['ascii'] else u'\u25b2'
             attr = curses.A_BOLD | Color.GREEN
         else:
-            symbol = 'v' if self.config.ascii else u'\u25bc'
+            symbol = 'v' if self.config['ascii'] else u'\u25bc'
             attr = curses.A_BOLD | Color.RED
         return symbol, attr
 
     def get_gold(self):
 
-        symbol = '*' if self.config.ascii else u'\u272A'
+        symbol = '*' if self.config['ascii'] else u'\u272A'
         attr = curses.A_BOLD | Color.YELLOW
         return symbol, attr
 
@@ -69,7 +72,7 @@ class CursesHelper(object):
         if n_cols is not None and n_cols <= 0:
             return ''
 
-        if self.config.ascii:
+        if self.config['ascii']:
             if six.PY3 or isinstance(string, unicode):
                 string = string.encode('ascii', 'replace')
             return string[:n_cols] if n_cols else string
@@ -105,7 +108,7 @@ class CursesHelper(object):
             # Trying to draw outside of the screen bounds
             return
 
-        text = clean(text, n_cols)
+        text = self.clean(text, n_cols)
         params = [] if attr is None else [attr]
         window.addstr(row, col, text, *params)
 
@@ -189,12 +192,13 @@ class CursesHelper(object):
         curses.curs_set(0)
         return strip_textpad(out)
 
-    def prompt_input(self, window, prompt, hide=False):
+    def prompt_input(self, prompt, hide=False):
         """
         Display a prompt where the user can enter text at the bottom of the
 
         screen. Set hide to True to make the input text invisible.
         """
+        window = self.stdscr
 
         attr = curses.A_BOLD | Color.CYAN
         n_rows, n_cols = window.getmaxyx()
@@ -298,6 +302,14 @@ class Color(object):
     """
     Color attributes for curses.
     """
+
+    RED = None
+    GREEN = None
+    YELLOW = None
+    BLUE = None
+    MAGENTA = None
+    CYAN = None
+    WHITE = None
 
     _colors = {
         'RED': (curses.COLOR_RED, -1),
