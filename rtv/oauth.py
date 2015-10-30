@@ -7,7 +7,7 @@ from praw.errors import OAuthAppRequired, OAuthInvalidToken
 from tornado import gen, ioloop, web, httpserver
 from concurrent.futures import ThreadPoolExecutor
 
-from .curses_helpers import CursesHelper
+from .curses_helpers import CursesBase
 from .helpers import check_browser_display, open_browser
 
 __all__ = ['OAuthTool']
@@ -29,7 +29,7 @@ class AuthHandler(web.RequestHandler):
             ioloop.IOLoop.current().stop()
 
 
-class OAuthTool(CursesHelper):
+class OAuthTool(CursesBase):
 
     def __init__(self, stdscr, reddit, config):
 

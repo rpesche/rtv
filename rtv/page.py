@@ -10,7 +10,7 @@ from praw.errors import APIException, ClientException
 
 from .docs import COMMENT_EDIT_FILE, SUBMISSION_FILE, HELP
 from .helpers import open_editor, oauth_required
-from .curses_helpers import Color, CursesHelper
+from .curses_helpers import Color, CursesBase
 
 _logger = logging.getLogger(__name__)
 
@@ -234,7 +234,7 @@ class BaseController(object):
         return wrap
 
 
-class BasePage(CursesHelper):
+class BasePage(CursesBase):
     """
     Base terminal viewer incorporates a cursor to navigate content
     """

@@ -12,7 +12,7 @@ from .helpers import strip_textpad
 from .exceptions import EscapeInterrupt
 
 
-class CursesHelper(object):
+class CursesBase(object):
 
     # ASCII code
     ESCAPE = 27
