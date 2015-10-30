@@ -189,6 +189,6 @@ class Config(object):
         Ensure that the directory exists before trying to write to the file.
         """
 
-        filepath = os.path.basename(filename)
+        filepath = os.path.dirname(filename)
         if not os.path.exists(filepath):
             os.makedirs(filepath)
