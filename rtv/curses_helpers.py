@@ -343,14 +343,11 @@ class Color(object):
         levels = [cls.MAGENTA, cls.CYAN, cls.GREEN, cls.YELLOW]
         return levels[level % len(levels)]
 
+def curses_session(func):
 
-@contextmanager
-def curses_session():
-    """
-    Setup terminal and initialize curses.
-    """
+    def wrapped():
+        stdscr = curses.wrapper(func)
 
-    try:
         # Curses must wait for some time after the Escape key is pressed to
         # check if it is the beginning of an escape sequence indicating a
         # special key. The default wait time is 1 second, which means that
@@ -360,39 +357,14 @@ def curses_session():
         # http://stackoverflow.com/questions/27372068
         os.environ['ESCDELAY'] = '25'
 
-        # Initialize curses
-        stdscr = curses.initscr()
-
-        # Turn off echoing of keys, and enter cbreak mode,
-        # where no buffering is performed on keyboard input
-        curses.noecho()
-        curses.cbreak()
-
-        # In keypad mode, escape sequences for special keys
-        # (like the cursor keys) will be interpreted and
-        # a special value like curses.KEY_LEFT will be returned
-        stdscr.keypad(1)
-
-        # Start color, too.  Harmless if the terminal doesn't have
-        # color; user can test with has_color() later on.  The try/catch
-        # works around a minor bit of over-conscientiousness in the curses
-        # module -- the error return from C start_color() is ignorable.
-        try:
-            curses.start_color()
-        except:
-            pass
+        # Hide the blinking cursor
+        curses.curs_set(0)
 
         Color.init()
 
-        # Hide blinking cursor
-        curses.curs_set(0)
+        return stdscr
+    return wrapped
 
-        yield stdscr
 
-    finally:
 
-        if 'stdscr' in locals() and stdscr is not None:
-            stdscr.keypad(0)
-            curses.echo()
-            curses.nocbreak()
-            curses.endwin()
+
