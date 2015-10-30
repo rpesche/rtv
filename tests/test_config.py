@@ -1,9 +1,13 @@
 import os
 import codecs
-from mock import patch
 from tempfile import NamedTemporaryFile
 
 from rtv.config import Config
+
+try:
+    from unittest import mock
+except ImportError:
+    import mock
 
 
 def test_config_interface():
@@ -32,12 +36,12 @@ def test_config_from_args():
             '--non-persistent',
             '--clear-auth']
 
-    with patch('sys.argv', ['rtv']):
+    with mock.patch('sys.argv', ['rtv']):
         config = Config()
         config.from_args()
         assert config.config == {}
 
-    with patch('sys.argv', args):
+    with mock.patch('sys.argv', args):
         config = Config()
         config.from_args()
         assert config['ascii'] is True
