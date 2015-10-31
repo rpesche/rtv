@@ -8,7 +8,6 @@ from functools import wraps
 from datetime import datetime
 from tempfile import NamedTemporaryFile
 
-# kitchen solves deficiencies in textwrap's handling of unicode characters
 from kitchen.text.display import wrap
 
 from .exceptions import ProgramError

@@ -12,7 +12,7 @@ from .helpers import check_browser_display, open_browser
 
 __all__ = ['OAuthTool']
 
-class AuthHandler(web.RequestHandler):
+class OAuthHandler(web.RequestHandler):
 
     state, code, error = None, None, None
 
@@ -39,7 +39,7 @@ class OAuthTool(CursesBase):
         self.http_server = None
 
         # Initialize Tornado webapp
-        routes = [('/', AuthHandler)]
+        routes = [('/', OAuthHandler)]
         self.callback_app = web.Application(
             routes, template_path=config['template_path'])
 
@@ -82,19 +82,19 @@ class OAuthTool(CursesBase):
                                                  authorize_url)
             ioloop.IOLoop.current().start()
 
-        if AuthHandler.error == 'access_denied':
+        if OAuthHandler.error == 'access_denied':
             self.show_notification('Declined access')
             return
-        elif AuthHandler.error is not None:
+        elif OAuthHandler.error is not None:
             self.show_notification('Authentication error')
             return
-        elif hex_uuid != AuthHandler.state:
+        elif hex_uuid != OAuthHandler.state:
             self.show_notification('UUID mismatch')
             return
 
         try:
             with self.loader(message='Logging in'):
-                access_info = self.reddit.get_access_information(AuthHandler.code)
+                access_info = self.reddit.get_access_information(OAuthHandler.code)
                 self.config.refresh_token = access_info['refresh_token']
                 if self.config['persistent']:
                     config.save_refresh_token()
