@@ -3,6 +3,7 @@ import time
 import six
 import sys
 import logging
+import inspect
 
 import requests
 from kitchen.text.display import textual_width
@@ -10,7 +11,7 @@ from praw.errors import APIException, ClientException
 
 from .docs import COMMENT_EDIT_FILE, SUBMISSION_FILE, HELP
 from .helpers import open_editor, oauth_required
-from .curses_helpers import Color, CursesHelper
+from .curses_helpers import Color, CursesBase
 
 _logger = logging.getLogger(__name__)
 
@@ -184,8 +185,7 @@ class SafeCaller(object):
                 _logger.exception(e)
                 return True
 
-
-class BaseController(object):
+class Controller(object):
     """
     Event handler for triggering functions with curses keypresses.
 
@@ -203,24 +203,34 @@ class BaseController(object):
     #>>> controller.trigger('a', *args)
     """
 
-    character_map = {None: (lambda *args, **kwargs: None)}
+    character_map = {}
 
     def __init__(self, instance):
+
         self.instance = instance
+        # Build a list of parent controllers that follow the object's MRO to
+        # check if any parent controllers have registered the keypress
+        self.parents = inspect.getmro(type(self))[:-1]
 
     def trigger(self, char, *args, **kwargs):
 
         if isinstance(char, six.string_types) and len(char) == 1:
             char = ord(char)
 
-        func = self.character_map.get(char)
-        if func is None:
-            func = BaseController.character_map.get(char)
-        if func is None:
-            func = self.character_map.get(None)
-        if func is None:
-            func = BaseController.character_map.get(None)
-        return func(self.instance, *args, **kwargs)
+        func = None
+        # Check if the controller (or any of the controller's parents) have
+        # registered a function to the given key
+        for controller in self.parents:
+            if func:
+                break
+            func = controller.character_map.get(char)
+        # If the controller has not registered the key, check if there is a
+        # default function registered
+        for controller in self.parents:
+            if func:
+                break
+            func = controller.character_map.get(None)
+        return func(self.instance, *args, **kwargs) if func else None
 
     @classmethod
     def register(cls, *chars):
@@ -233,8 +243,10 @@ class BaseController(object):
             return f
         return wrap
 
+class BaseController(Controller):
+    character_map = {}
 
-class BasePage(CursesHelper):
+class BasePage(CursesBase):
     """
     Base terminal viewer incorporates a cursor to navigate content
     """
