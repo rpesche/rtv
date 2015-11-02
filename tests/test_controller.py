@@ -5,6 +5,7 @@ try:
 except ImportError:
     import mock
 
+
 def test_controller():
 
     class ControllerA(Controller):

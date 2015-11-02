@@ -5,7 +5,7 @@ import curses
 from .content import SubmissionContent
 from .page import Navigator, BasePage, BaseController
 from .helpers import open_browser, open_editor, oauth_required
-from .curses_helpers import Color
+from .terminal import Color
 from .docs import COMMENT_FILE
 
 

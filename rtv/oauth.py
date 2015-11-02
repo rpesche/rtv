@@ -1,16 +1,13 @@
-import os
 import time
 import uuid
 
-import praw
 from praw.errors import OAuthAppRequired, OAuthInvalidToken
 from tornado import gen, ioloop, web, httpserver
 from concurrent.futures import ThreadPoolExecutor
 
-from .curses_helpers import CursesBase
+from .terminal import CursesBase
 from .helpers import check_browser_display, open_browser
 
-__all__ = ['OAuthTool']
 
 class OAuthHandler(web.RequestHandler):
 

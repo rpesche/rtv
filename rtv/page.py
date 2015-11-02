@@ -11,7 +11,7 @@ from praw.errors import APIException, ClientException
 
 from .docs import COMMENT_EDIT_FILE, SUBMISSION_FILE, HELP
 from .helpers import open_editor, oauth_required
-from .curses_helpers import Color, CursesBase
+from .terminal import Color, CursesBase
 
 _logger = logging.getLogger(__name__)
 

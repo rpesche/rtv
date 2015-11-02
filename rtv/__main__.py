@@ -9,7 +9,7 @@ from requests.exceptions import RequestException
 
 from .config import Config
 from .exceptions import RTVError
-from .curses_helpers import curses_session
+from .terminal import curses_session
 from .subreddit import SubredditPage
 from .docs import AGENT
 from .oauth import OAuthTool

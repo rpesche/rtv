@@ -1,9 +1,9 @@
 import os
 import time
-import threading
 import curses
+import threading
+import webbrowser
 from curses import textpad, ascii
-from contextlib import contextmanager
 
 import six
 from kitchen.text.display import textual_width_chop
@@ -12,7 +12,7 @@ from .helpers import strip_textpad
 from .exceptions import EscapeInterrupt
 
 
-class CursesBase(object):
+class Terminal(object):
 
     # ASCII code
     ESCAPE = 27
@@ -22,6 +22,55 @@ class CursesBase(object):
         self.stdscr = stdscr
         self.config = config
         self.loader = LoadScreen(stdscr)
+
+        self._display = None
+
+    @property
+    def up_arrow(self):
+        symbol = u'^' if self.config['ascii'] else u'\u25b2'
+        attr = curses.A_BOLD | Color.GREEN
+        return symbol, attr
+
+    @property
+    def down_arrow(self):
+        symbol = u'v' if self.config['ascii'] else u'\u25bc'
+        attr = curses.A_BOLD | Color.RED
+        return symbol, attr
+
+    @property
+    def neutral_arrow(self):
+        symbol = u'o' if self.config['ascii'] else u'\u2022'
+        attr = curses.A_BOLD
+        return symbol, attr
+
+    @property
+    def guilded(self):
+        symbol = u'*' if self.config['ascii'] else u'\u272A'
+        attr = curses.A_BOLD | Color.YELLOW
+        return symbol, attr
+
+    @property
+    def display(self):
+        """
+        Use a number of methods to guess if the default webbrowser will open in
+        the background as opposed to opening directly in the terminal.
+        """
+
+        if self._display is None:
+            display = bool(os.environ.get("DISPLAY"))
+            # Use the convention defined here to parse $BROWSER
+            # https://docs.python.org/2/library/webbrowser.html
+            console_browsers = ['www-browser', 'links', 'links2', 'elinks',
+                                'lynx', 'w3m']
+            if "BROWSER" in os.environ:
+                user_browser = os.environ["BROWSER"].split(os.pathsep)[0]
+                if user_browser in console_browsers:
+                    display = False
+            if webbrowser._tryorder:
+                if webbrowser._tryorder[0] in console_browsers:
+                    display = False
+            self._display = display
+        return self._display
 
     def get_arrow(self, likes):
         """
@@ -33,21 +82,11 @@ class CursesBase(object):
         """
 
         if likes is None:
-            symbol = u'o' if self.config['ascii'] else u'\u2022'
-            attr = curses.A_BOLD
+            return self.neutral_arrow
         elif likes:
-            symbol = u'^' if self.config['ascii'] else u'\u25b2'
-            attr = curses.A_BOLD | Color.GREEN
+            return self.up_arrow
         else:
-            symbol = u'v' if self.config['ascii'] else u'\u25bc'
-            attr = curses.A_BOLD | Color.RED
-        return symbol, attr
-
-    def get_gold(self):
-
-        symbol = u'*' if self.config['ascii'] else u'\u272A'
-        attr = curses.A_BOLD | Color.YELLOW
-        return symbol, attr
+            return self.down_arrow
 
     def clean(self, string, n_cols=None):
         """
@@ -146,7 +185,7 @@ class CursesBase(object):
         ch = self.stdscr.getch()
 
         window.clear()
-        window = None
+        del window
         self.stdscr.refresh()
 
         return ch
@@ -165,25 +204,25 @@ class CursesBase(object):
         # Set cursor mode to 1 because 2 doesn't display on some terminals
         curses.curs_set(1)
 
-        # Turn insert_mode off to avoid the recursion error described here
+        # Keep insert_mode off to avoid the recursion error described here
         # http://bugs.python.org/issue13051
-        textbox = textpad.Textbox(window, insert_mode=False)
+        textbox = textpad.Textbox(window)
         textbox.stripspaces = 0
 
         def validate(ch):
             "Filters characters for special key sequences"
             if ch == self.ESCAPE:
-                raise EscapeInterrupt
+                raise EscapeInterrupt()
             if (not allow_resize) and (ch == curses.KEY_RESIZE):
-                raise EscapeInterrupt
+                raise EscapeInterrupt()
             # Fix backspace for iterm
             if ch == ascii.DEL:
                 ch = curses.KEY_BACKSPACE
             return ch
 
-        # Wrapping in an exception block so that we can distinguish when the user
-        # hits the return character from when the user tries to back out of the
-        # input.
+        # Wrapping in an exception block so that we can distinguish when the
+        # user hits the return character from when the user tries to back out
+        # of the input.
         try:
             out = textbox.edit(validate=validate)
         except EscapeInterrupt:
@@ -198,20 +237,20 @@ class CursesBase(object):
 
         screen. Set hide to True to make the input text invisible.
         """
-        window = self.stdscr
 
+        # TODO: This is probably broken for unicode
         attr = curses.A_BOLD | Color.CYAN
-        n_rows, n_cols = window.getmaxyx()
+        n_rows, n_cols = self.stdscr.getmaxyx()
 
         if hide:
             prompt += ' ' * (n_cols - len(prompt) - 1)
-            window.addstr(n_rows-1, 0, prompt, attr)
-            out = window.getstr(n_rows-1, 1)
+            self.stdscr.addstr(n_rows-1, 0, prompt, attr)
+            out = self.stdscr.getstr(n_rows-1, 1)
         else:
-            window.addstr(n_rows - 1, 0, prompt, attr)
-            window.refresh()
-            subwin = window.derwin(1, n_cols - len(prompt),
-                                   n_rows - 1, len(prompt))
+            self.stdscr.addstr(n_rows - 1, 0, prompt, attr)
+            self.stdscr.refresh()
+            subwin = self.stdscr.derwin(1, n_cols - len(prompt),
+                                        n_rows - 1, len(prompt))
             subwin.attrset(attr)
             out = self.text_input(subwin)
 
@@ -283,10 +322,9 @@ class LoadScreen(object):
 
         while True:
             for i in range(len(trail) + 1):
-
                 if not self._is_running:
                     window.clear()
-                    window = None
+                    del window
                     self._stdscr.refresh()
                     return
 
@@ -303,13 +341,13 @@ class Color(object):
     Color attributes for curses.
     """
 
-    RED = None
-    GREEN = None
-    YELLOW = None
-    BLUE = None
-    MAGENTA = None
-    CYAN = None
-    WHITE = None
+    RED = curses.A_NORMAL
+    GREEN = curses.A_NORMAL
+    YELLOW = curses.A_NORMAL
+    BLUE = curses.A_NORMAL
+    MAGENTA = curses.A_NORMAL
+    CYAN = curses.A_NORMAL
+    WHITE = curses.A_NORMAL
 
     _colors = {
         'RED': (curses.COLOR_RED, -1),
@@ -342,6 +380,7 @@ class Color(object):
 
         levels = [cls.MAGENTA, cls.CYAN, cls.GREEN, cls.YELLOW]
         return levels[level % len(levels)]
+
 
 def curses_session(func):
 

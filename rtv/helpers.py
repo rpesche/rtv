@@ -88,29 +88,6 @@ def open_browser(url):
         curses.doupdate()
 
 
-def check_browser_display():
-    """
-    Use a number of methods to guess if the default webbrowser will open in
-    the background as opposed to opening directly in the terminal.
-    """
-
-    display = bool(os.environ.get("DISPLAY"))
-
-    # Use the convention defined here to parse $BROWSER
-    # https://docs.python.org/2/library/webbrowser.html
-    console_browsers = ['www-browser', 'links', 'links2', 'elinks', 'lynx',
-                        'w3m']
-    if "BROWSER" in os.environ:
-        user_browser = os.environ["BROWSER"].split(os.pathsep)[0]
-        if user_browser in console_browsers:
-            display = False
-
-    if webbrowser._tryorder and webbrowser._tryorder[0] in console_browsers:
-        display = False
-
-    return display
-
-
 def wrap_text(text, width):
     """
     Wrap text paragraphs to the given character width while preserving

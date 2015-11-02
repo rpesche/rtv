@@ -2,7 +2,7 @@ import curses
 
 from .content import SubscriptionContent
 from .page import BasePage, Navigator, BaseController
-from .curses_helpers import Color, LoadScreen
+from .terminal import Color, LoadScreen
 
 
 class SubscriptionController(BaseController):

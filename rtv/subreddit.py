@@ -9,7 +9,7 @@ from .submission import SubmissionPage
 from .subscription import SubscriptionPage
 from .content import SubredditContent
 from .helpers import open_browser, open_editor, oauth_required
-from .curses_helpers import Color, LoadScreen
+from .terminal import Color, LoadScreen
 from .docs import SUBMISSION_FILE
 
 
