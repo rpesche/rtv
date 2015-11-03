@@ -16,6 +16,7 @@ class Terminal(object):
 
     # ASCII code
     ESCAPE = 27
+    RETURN = 10
 
     def __init__(self, stdscr, config):
 
@@ -160,7 +161,7 @@ class Terminal(object):
             message (list or string): List of strings, one per line.
         """
 
-        if isinstance(message, basestring):
+        if isinstance(message, six.string_types):
             message = [message]
 
         n_rows, n_cols = self.stdscr.getmaxyx()
@@ -196,8 +197,9 @@ class Terminal(object):
         Transform a window into a text box that will accept user input and loop
         until an escape sequence is entered.
 
-        If enter is pressed, return the input text as a string.
-        If escape is pressed, return None.
+        If the escape key (27) is pressed, cancel the textbox and return None.
+        Otherwise, the textbox will wait until it is full (^j, or a new line is
+        entered on the bottom line) or the BEL key (^g) is pressed.
         """
 
         window.clear()
@@ -226,6 +228,8 @@ class Terminal(object):
         # of the input.
         try:
             out = textbox.edit(validate=validate)
+            if isinstance(out, six.binary_type):
+                out = out.decode('utf-8')
         except EscapeInterrupt:
             out = None
 

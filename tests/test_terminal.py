@@ -1,10 +1,9 @@
 # -*- coding: utf-8 -*-
+import curses
 
 import six
 
 from rtv.docs import HELP
-from rtv.terminal import Terminal, LoadScreen, Color
-from rtv.config import Config
 
 try:
     from unittest import mock
@@ -12,9 +11,7 @@ except ImportError:
     import mock
 
 
-def test_terminal_properties(config, stdscr):
-
-    terminal = Terminal(stdscr, config)
+def test_terminal_properties(terminal):
 
     assert len(terminal.up_arrow) == 2
     assert isinstance(terminal.up_arrow[0], six.text_type)
@@ -42,62 +39,50 @@ def test_terminal_properties(config, stdscr):
     assert terminal.get_arrow(False) is not None
 
 
-def test_terminal_clean_ascii(stdscr):
+def test_terminal_clean(terminal):
 
-    config = Config(ascii=True)
-    terminal = Terminal(stdscr, config)
-
-    # unicode returns ascii
-    text = terminal.clean(u'hello ❤')
-    assert isinstance(text, six.binary_type)
-    assert text.decode('ascii') == u'hello ?'
-    # utf-8 returns ascii
-    text = terminal.clean(u'hello ❤'.encode('utf-8'))
-    assert isinstance(text, six.binary_type)
-    assert text.decode('ascii') == u'hello ?'
-    # ascii returns ascii
-    text = terminal.clean(u'hello'.encode('ascii'))
-    assert isinstance(text, six.binary_type)
-    assert text.decode('ascii') == u'hello'
-
-
-def test_terminal_clean_utf8(stdscr):
-
-    config = Config(ascii=False)
-    terminal = Terminal(stdscr, config)
-
-    # unicode returns utf-8
-    text = terminal.clean(u'hello ❤')
-    assert isinstance(text, six.binary_type)
-    assert text.decode('utf-8') == u'hello ❤'
-    # utf-8 returns utf-8
-    text = terminal.clean(u'hello ❤'.encode('utf-8'))
-    assert isinstance(text, six.binary_type)
-    assert text.decode('utf-8') == u'hello ❤'
-    # ascii returns utf-8
-    text = terminal.clean(u'hello'.encode('ascii'))
-    assert isinstance(text, six.binary_type)
-    assert text.decode('utf-8') == u'hello'
+    if terminal.config['ascii']:
+        # unicode returns ascii
+        text = terminal.clean(u'hello ❤')
+        assert isinstance(text, six.binary_type)
+        assert text.decode('ascii') == u'hello ?'
+        # utf-8 returns ascii
+        text = terminal.clean(u'hello ❤'.encode('utf-8'))
+        assert isinstance(text, six.binary_type)
+        assert text.decode('ascii') == u'hello ?'
+        # ascii returns ascii
+        text = terminal.clean(u'hello'.encode('ascii'))
+        assert isinstance(text, six.binary_type)
+        assert text.decode('ascii') == u'hello'
+    else:
+        # unicode returns utf-8
+        text = terminal.clean(u'hello ❤')
+        assert isinstance(text, six.binary_type)
+        assert text.decode('utf-8') == u'hello ❤'
+        # utf-8 returns utf-8
+        text = terminal.clean(u'hello ❤'.encode('utf-8'))
+        assert isinstance(text, six.binary_type)
+        assert text.decode('utf-8') == u'hello ❤'
+        # ascii returns utf-8
+        text = terminal.clean(u'hello'.encode('ascii'))
+        assert isinstance(text, six.binary_type)
+        assert text.decode('utf-8') == u'hello'
 
 
-def test_terminal_clean_ncols(stdscr):
+def test_terminal_clean_ncols(terminal):
 
-    config = Config(ascii=False)
-    terminal = Terminal(stdscr, config)
-
-    text = terminal.clean(u'hello', n_cols=5)
-    assert text.decode('utf-8') == u'hello'
-    text = terminal.clean(u'hello', n_cols=4)
-    assert text.decode('utf-8') == u'hell'
-    text = terminal.clean(u'ｈｅｌｌｏ', n_cols=10)
-    assert text.decode('utf-8') == u'ｈｅｌｌｏ'
-    text = terminal.clean(u'ｈｅｌｌｏ', n_cols=9)
-    assert text.decode('utf-8') == u'ｈｅｌｌ'
+    if not terminal.config['ascii']:
+        text = terminal.clean(u'hello', n_cols=5)
+        assert text.decode('utf-8') == u'hello'
+        text = terminal.clean(u'hello', n_cols=4)
+        assert text.decode('utf-8') == u'hell'
+        text = terminal.clean(u'ｈｅｌｌｏ', n_cols=10)
+        assert text.decode('utf-8') == u'ｈｅｌｌｏ'
+        text = terminal.clean(u'ｈｅｌｌｏ', n_cols=9)
+        assert text.decode('utf-8') == u'ｈｅｌｌ'
 
 
-def test_terminal_add_line(stdscr, config):
-
-    terminal = Terminal(stdscr, config)
+def test_terminal_add_line(terminal, stdscr):
 
     terminal.add_line(stdscr, u'hello')
     assert stdscr.addstr.called_with(0, 0, u'hello'.encode('ascii'))
@@ -114,8 +99,36 @@ def test_terminal_add_line(stdscr, config):
     stdscr.reset_mock()
 
 
-def test_show_notification(stdscr, config):
+def test_show_notification(terminal, stdscr):
 
-    terminal = Terminal(stdscr, config)
+    # The whole message should fit in 40x80
+    text = HELP.strip().splitlines()
+    terminal.show_notification(text)
+    assert stdscr.subwin.nlines == len(text) + 2
+    assert stdscr.subwin.ncols == 80
+    assert stdscr.subwin.addstr.call_count == len(text)
+    stdscr.reset_mock()
 
-    terminal.show_notification(HELP)
+    # The text should be trimmed to fit in 20x20
+    stdscr.nlines, stdscr.ncols = 15, 20
+    text = HELP.strip().splitlines()
+    terminal.show_notification(text)
+    assert stdscr.subwin.nlines == 15
+    assert stdscr.subwin.ncols == 20
+    assert stdscr.subwin.addstr.call_count == 13
+
+
+def test_text_input(terminal, stdscr):
+
+    stdscr.nlines = 1
+    with mock.patch('curses.curs_set'):
+        # Text will be wrong because stdscr.inch() is not implemented
+        # But we can at least tell if text was captured or not
+        stdscr.getch.side_effect = ['h', 'i', '!', terminal.RETURN]
+        assert isinstance(terminal.text_input(stdscr), six.text_type)
+        stdscr.getch.side_effect = ['b', 'y', 'e', terminal.ESCAPE]
+        assert terminal.text_input(stdscr) is None
+        stdscr.getch.side_effect = ['h', curses.KEY_RESIZE, terminal.RETURN]
+        assert terminal.text_input(stdscr, allow_resize=True) is not None
+        stdscr.getch.side_effect = ['h', curses.KEY_RESIZE, terminal.RETURN]
+        assert terminal.text_input(stdscr, allow_resize=False) is None

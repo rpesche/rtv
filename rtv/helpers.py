@@ -112,16 +112,16 @@ def strip_textpad(text):
         return text
 
     # Trivial case where the textbox is only one line long.
-    if '\n' not in text:
+    if u'\n' not in text:
         return text.rstrip()
 
     # Allow one space at the end of the line. If there is more than one space,
     # assume that a newline operation was intended by the user
-    stack, current_line = [], ''
-    for line in text.split('\n'):
-        if line.endswith('  '):
+    stack, current_line = [], u''
+    for line in text.split(u'\n'):
+        if line.endswith(u'  '):
             stack.append(current_line + line.rstrip())
-            current_line = ''
+            current_line = u''
         else:
             current_line += line
     stack.append(current_line)
@@ -133,7 +133,7 @@ def strip_textpad(text):
         else:
             break
 
-    out = '\n'.join(stack)
+    out = u'\n'.join(stack)
     return out
 
 

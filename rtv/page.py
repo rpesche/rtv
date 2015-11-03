@@ -293,7 +293,7 @@ class BasePage(Terminal):
 
     @BaseController.register('?')
     def help(self):
-        self.show_notification(HELP.splitlines())
+        self.show_notification(HELP.strip().splitlines())
 
     @BaseController.register('1')
     def sort_content_hot(self):
