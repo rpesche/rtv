@@ -112,13 +112,14 @@ class Terminal(object):
             return ''
 
         if self.config['ascii']:
-            if six.PY3 or isinstance(string, unicode):
-                string = string.encode('ascii', 'replace')
+            if isinstance(string, six.binary_type):
+                string = string.decode('utf-8')
+            string = string.encode('ascii', 'replace')
             return string[:n_cols] if n_cols else string
         else:
             if n_cols:
                 string = textual_width_chop(string, n_cols)
-            if six.PY3 or isinstance(string, unicode):
+            if isinstance(string, six.text_type):
                 string = string.encode('utf-8')
             return string
 
