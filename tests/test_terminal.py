@@ -1,9 +1,14 @@
 # -*- coding: utf-8 -*-
+from __future__ import unicode_literals
+
+import time
 import curses
 
 import six
+import pytest
 
 from rtv.docs import HELP
+from rtv.terminal import LoadScreen, Color, curses_session
 
 try:
     from unittest import mock
@@ -37,6 +42,7 @@ def test_terminal_properties(terminal):
     assert terminal.get_arrow(None) is not None
     assert terminal.get_arrow(True) is not None
     assert terminal.get_arrow(False) is not None
+    assert isinstance(terminal.loader, LoadScreen)
 
 
 def test_terminal_clean(terminal):
@@ -144,6 +150,7 @@ def test_text_input(terminal, stdscr):
         stdscr.getch.side_effect = ['h', curses.KEY_RESIZE, terminal.RETURN]
         assert terminal.text_input(stdscr, allow_resize=False) is None
 
+
 def test_prompt_input(terminal, stdscr):
 
     window = stdscr.derwin()
@@ -159,8 +166,104 @@ def test_prompt_input(terminal, stdscr):
         window.getch.side_effect = ['b', 'y', 'e', terminal.ESCAPE]
         assert terminal.prompt_input('hi') is None
 
-        window.getch.side_effect = ['h', 'e', 'l', 'l', 'o', terminal.RETURN]
-        assert terminal.prompt_input('hi', key=True) == 'h'
+        stdscr.getch.side_effect = ['b', 'e', 'l', 'l', 'o', terminal.RETURN]
+        assert terminal.prompt_input('hi', key=True) == 'b'
 
-        window.getch.side_effect = ['h', 'e', 'l', 'l', 'o', terminal.RETURN]
-        assert terminal.prompt_input('hi', key=True) == 'h'
+        stdscr.getch.side_effect = [terminal.ESCAPE, 'e', 'l', 'l', 'o']
+        assert terminal.prompt_input('hi', key=True) is None
+
+
+def test_load_screen(terminal, stdscr):
+
+    window = stdscr.derwin()
+
+    # Ensure the thread is properly started/stopped
+    with terminal.loader(delay=0, message=u'Hello', trail=u'...'):
+        assert terminal.loader._animator.is_alive()
+    assert not terminal.loader._is_running
+    assert not terminal.loader._animator.is_alive()
+    assert window.ncols == 10
+    assert window.nlines == 3
+    stdscr.refresh.assert_called()
+    stdscr.reset_mock()
+
+    # Raising and exception should clean up the loader properly
+    with pytest.raises(Exception):
+        with terminal.loader(delay=0):
+            assert terminal.loader._animator.is_alive()
+            raise Exception()
+    assert not terminal.loader._is_running
+    assert not terminal.loader._animator.is_alive()
+    stdscr.refresh.assert_called()
+    stdscr.reset_mock()
+
+    # If we don't reach the initial delay nothing should be drawn
+    with terminal.loader(delay=0.1):
+        time.sleep(0.05)
+    window.addstr.assert_not_called()
+    window.reset_mock()
+
+
+def test_color():
+
+    colors = ['RED', 'GREEN', 'YELLOW', 'BLUE', 'MAGENTA', 'CYAN', 'WHITE']
+
+    with mock.patch('curses.use_default_colors') as default_colors, \
+            mock.patch('curses.color_pair') as color_pair, \
+            mock.patch('curses.init_pair'):
+        color_pair.return_value = 23
+
+        # Check that all colors start with the default value
+        for color in colors:
+            assert getattr(Color, color) == curses.A_NORMAL
+
+        Color.init()
+        default_colors.assert_called()
+
+        # Check that all colors are populated
+        for color in colors:
+            assert getattr(Color, color) == 23
+
+
+def test_curses_session(stdscr):
+
+    # Couldn't find a way to patch all of curses at once!
+    with mock.patch('curses.initscr') as initscr, \
+            mock.patch('curses.endwin') as endwin, \
+            mock.patch('curses.noecho'), \
+            mock.patch('curses.echo'), \
+            mock.patch('curses.nocbreak'), \
+            mock.patch('curses.cbreak'), \
+            mock.patch('curses.start_color'), \
+            mock.patch('curses.curs_set'), \
+            mock.patch('curses.use_default_colors'), \
+            mock.patch('curses.color_pair'), \
+            mock.patch('curses.init_pair'):
+        initscr.return_value = stdscr
+
+        # Normal setup and cleanup
+        with curses_session():
+            pass
+        initscr.assert_called()
+        initscr.reset_mock()
+        endwin.assert_called()
+        endwin.reset_mock()
+
+        # Ensure cleanup runs if an error occurs
+        with pytest.raises(KeyboardInterrupt):
+            with curses_session():
+                raise KeyboardInterrupt()
+        initscr.assert_called()
+        initscr.reset_mock()
+        endwin.assert_called()
+        endwin.reset_mock()
+
+        # But cleanup shouldn't run if stdscr was never instantiated
+        initscr.side_effect = KeyboardInterrupt()
+        with pytest.raises(KeyboardInterrupt):
+            with curses_session():
+                pass
+        initscr.assert_called()
+        initscr.reset_mock()
+        endwin.assert_not_called()
+        endwin.reset_mock()

@@ -1,3 +1,6 @@
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals
+
 import os
 import time
 import curses
@@ -29,25 +32,25 @@ class Terminal(object):
 
     @property
     def up_arrow(self):
-        symbol = u'^' if self.config['ascii'] else u'\u25b2'
+        symbol = '^' if self.config['ascii'] else '▲'
         attr = curses.A_BOLD | Color.GREEN
         return symbol, attr
 
     @property
     def down_arrow(self):
-        symbol = u'v' if self.config['ascii'] else u'\u25bc'
+        symbol = 'v' if self.config['ascii'] else '▼'
         attr = curses.A_BOLD | Color.RED
         return symbol, attr
 
     @property
     def neutral_arrow(self):
-        symbol = u'o' if self.config['ascii'] else u'\u2022'
+        symbol = 'o' if self.config['ascii'] else '•'
         attr = curses.A_BOLD
         return symbol, attr
 
     @property
     def guilded(self):
-        symbol = u'*' if self.config['ascii'] else u'\u272A'
+        symbol = '*' if self.config['ascii'] else '✪'
         attr = curses.A_BOLD | Color.YELLOW
         return symbol, attr
 
@@ -185,7 +188,7 @@ class Terminal(object):
         for index, line in enumerate(message, start=1):
             self.add_line(window, line, index, 1)
         window.refresh()
-        ch = six.unichr(self.stdscr.getch())
+        ch = self.stdscr.getch()
 
         window.clear()
         del window
@@ -259,7 +262,9 @@ class Terminal(object):
         if key:
             curses.curs_set(1)
             ch = self.stdscr.getch()
-            text = six.unichr(ch) if ch != self.ESCAPE else None
+            # Can't convert ch to unicode because it may be an arbitrary
+            # keyboard code, e.g. F1, that doesn't map through six.unichr
+            text = ch if ch != self.ESCAPE else None
             curses.curs_set(0)
         else:
             text = self.text_input(window)
@@ -322,6 +327,7 @@ class LoadScreen(object):
         while (time.time() - start) < delay:
             if not self._is_running:
                 return
+            time.sleep(0.01)
 
         message_len = len(message) + len(trail)
         n_rows, n_cols = self._stdscr.getmaxyx()
@@ -440,5 +446,3 @@ def curses_session():
             curses.echo()
             curses.nocbreak()
             curses.endwin()
-
-
