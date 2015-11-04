@@ -1,3 +1,6 @@
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals
+
 import sys
 import locale
 import logging
@@ -11,8 +14,9 @@ from .config import Config
 from .exceptions import RTVError
 from .terminal import curses_session
 from .subreddit import SubredditPage
+from .terminal import Terminal
 from .docs import AGENT
-from .oauth import OAuthTool
+from .oauth import OAuthHelper
 from .__version__ import __version__
 
 __all__ = []
@@ -35,7 +39,7 @@ def main():
 
     # Set the terminal title
     title = 'rtv {0}'.format(__version__)
-    sys.stdout.write("\x1b]2;{0}\x07".format(title))
+    sys.stdout.write('\x1b]2;{0}\x07'.format(title))
 
     # Attempt to load from the config file first, and then overwrite with any
     # provided command line arguments.
@@ -59,9 +63,10 @@ def main():
         user_agent = AGENT.format(version=__version__)
         reddit = praw.Reddit(user_agent=user_agent, decode_html_entities=False)
         with curses_session() as stdscr:
+            term = Terminal(stdscr, config['ascii'])
 
             # Authorize on launch if the refresh token is present
-            oauth = OAuthTool(stdscr, reddit, config)
+            oauth = OAuthHelper(reddit, term, config)
             if config.refresh_token:
                 oauth.authorize()
 

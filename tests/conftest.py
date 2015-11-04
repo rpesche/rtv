@@ -1,7 +1,12 @@
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals
+
+import praw
 import pytest
 
 from rtv.config import Config
 from rtv.terminal import Terminal
+from rtv.oauth import OAuthHelper
 
 try:
     from unittest import mock
@@ -10,6 +15,11 @@ except ImportError:
 
 
 class MockStdscr(mock.MagicMock):
+    """
+    Extend mock to mimic curses.stdscr by keeping track of the terminal
+    coordinates and allowing for the creation of subwindows with the same
+    properties as stdscr.
+    """
 
     def getyx(self):
         return self.y, self.x
@@ -44,16 +54,26 @@ class MockStdscr(mock.MagicMock):
         return self.subwin
 
 
-@pytest.fixture(scope='module', params=[{'ascii': True}, {'ascii': False}],
-                ids=['ascii', 'unicode'])
+@pytest.fixture(params=[{'ascii': True}, {'ascii': False}])
 def config(request):
     return Config(**request.param)
 
 
-@pytest.fixture(scope='function')
+@pytest.fixture()
 def stdscr():
     return MockStdscr(nlines=40, ncols=80, x=0, y=0)
 
-@pytest.fixture(scope='function')
+
+@pytest.fixture()
 def terminal(stdscr, config):
-    return Terminal(stdscr, config)
+    return Terminal(stdscr, ascii=config['ascii'])
+
+
+@pytest.fixture()
+def reddit():
+    return praw.Reddit(user_agent='rtv test suite', decode_html_entities=False)
+
+
+@pytest.fixture()
+def oauth(reddit, terminal, config):
+    return OAuthHelper(reddit, terminal, config)

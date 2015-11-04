@@ -6,7 +6,8 @@ import time
 import curses
 import threading
 import webbrowser
-from curses import textpad, ascii
+import curses.ascii
+from curses import textpad
 from contextlib import contextmanager
 
 import six
@@ -22,35 +23,35 @@ class Terminal(object):
     ESCAPE = 27
     RETURN = 10
 
-    def __init__(self, stdscr, config):
+    def __init__(self, stdscr, ascii=False):
 
         self.stdscr = stdscr
-        self.config = config
-        self.loader = LoadScreen(stdscr)
+        self.ascii = ascii
+        self.loader = LoadScreen(self.stdscr)
 
         self._display = None
 
     @property
     def up_arrow(self):
-        symbol = '^' if self.config['ascii'] else '▲'
+        symbol = '^' if self.ascii else '▲'
         attr = curses.A_BOLD | Color.GREEN
         return symbol, attr
 
     @property
     def down_arrow(self):
-        symbol = 'v' if self.config['ascii'] else '▼'
+        symbol = 'v' if self.ascii else '▼'
         attr = curses.A_BOLD | Color.RED
         return symbol, attr
 
     @property
     def neutral_arrow(self):
-        symbol = 'o' if self.config['ascii'] else '•'
+        symbol = 'o' if self.ascii else '•'
         attr = curses.A_BOLD
         return symbol, attr
 
     @property
     def guilded(self):
-        symbol = '*' if self.config['ascii'] else '✪'
+        symbol = '*' if self.ascii else '✪'
         attr = curses.A_BOLD | Color.YELLOW
         return symbol, attr
 
@@ -116,7 +117,7 @@ class Terminal(object):
         if n_cols is not None and n_cols <= 0:
             return ''
 
-        if self.config['ascii']:
+        if self.ascii:
             if isinstance(string, six.binary_type):
                 string = string.decode('utf-8')
             string = string.encode('ascii', 'replace')
@@ -223,7 +224,7 @@ class Terminal(object):
             if (not allow_resize) and (ch == curses.KEY_RESIZE):
                 raise EscapeInterrupt()
             # Fix backspace for iterm
-            if ch == ascii.DEL:
+            if ch == curses.ascii.DEL:
                 ch = curses.KEY_BACKSPACE
             return ch
 

@@ -16,7 +16,7 @@ except ImportError:
     import mock
 
 
-def test_terminal_properties(terminal):
+def test_terminal_properties(terminal, config):
 
     assert len(terminal.up_arrow) == 2
     assert isinstance(terminal.up_arrow[0], six.text_type)
@@ -42,12 +42,13 @@ def test_terminal_properties(terminal):
     assert terminal.get_arrow(None) is not None
     assert terminal.get_arrow(True) is not None
     assert terminal.get_arrow(False) is not None
+    assert terminal.ascii == config['ascii']
     assert isinstance(terminal.loader, LoadScreen)
 
 
 def test_terminal_clean(terminal):
 
-    if terminal.config['ascii']:
+    if terminal.ascii:
         # unicode returns ascii
         text = terminal.clean('hello ❤')
         assert isinstance(text, six.binary_type)
@@ -81,7 +82,7 @@ def test_terminal_clean(terminal):
 
 def test_terminal_clean_ncols(terminal):
 
-    if not terminal.config['ascii']:
+    if not terminal.ascii:
         text = terminal.clean('hello', n_cols=5)
         assert text.decode('utf-8') == 'hello'
 

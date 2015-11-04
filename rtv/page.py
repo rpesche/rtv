@@ -7,7 +7,6 @@ import inspect
 
 import requests
 from kitchen.text.display import textual_width
-from praw.errors import APIException, ClientException
 
 from .docs import COMMENT_EDIT_FILE, SUBMISSION_FILE, HELP
 from .helpers import open_editor, oauth_required

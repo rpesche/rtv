@@ -1,3 +1,6 @@
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals
+
 import os
 import codecs
 from tempfile import NamedTemporaryFile
@@ -30,7 +33,7 @@ def test_config_from_args():
 
     args = ['rtv',
             '-s', 'cfb',
-            '-l', u'https://reddit.com/permalink\u2022',
+            '-l', 'https://reddit.com/permalink •',
             '--log', 'logfile.log',
             '--ascii',
             '--non-persistent',
@@ -46,7 +49,7 @@ def test_config_from_args():
         config.from_args()
         assert config['ascii'] is True
         assert config['subreddit'] == 'cfb'
-        assert config['link'] == u'https://reddit.com/permalink\u2022'
+        assert config['link'] == 'https://reddit.com/permalink •'
         assert config['log'] == 'logfile.log'
         assert config['ascii'] is True
         assert config['persistent'] is False
@@ -61,7 +64,7 @@ def test_config_from_file():
         'persistent': False,
         'clear_auth': True,
         'log': 'logfile.log',
-        'link': u'https://reddit.com/permalink\u2022',
+        'link': 'https://reddit.com/permalink •',
         'subreddit': 'cfb'}
 
     with NamedTemporaryFile(suffix='.cfg') as fp:
@@ -69,8 +72,8 @@ def test_config_from_file():
         config.from_file()
         assert config.config == {}
 
-        rows = [u'{}={}'.format(key, val) for key, val in args.items()]
-        data = u'\n'.join([u'[rtv]'] + rows)
+        rows = ['{}={}'.format(key, val) for key, val in args.items()]
+        data = '\n'.join(['[rtv]'] + rows)
         fp.write(codecs.encode(data, 'utf-8'))
         fp.flush()
         config.from_file()

@@ -1,6 +1,6 @@
-"""
-Global configuration settings
-"""
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals
+
 import os
 import codecs
 import argparse
@@ -176,7 +176,7 @@ class Config(object):
     def save_history(self):
         self._ensure_filepath(self.history_file)
         with codecs.open(self.history_file, 'w+', encoding='utf-8') as fp:
-            fp.writelines(u'\n'.join(self.history[-self['history_size']:]))
+            fp.writelines('\n'.join(self.history[-self['history_size']:]))
 
     def delete_history(self):
         if os.path.exists(self.history_file):

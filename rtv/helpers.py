@@ -1,5 +1,8 @@
-import sys
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals
+
 import os
+import sys
 import curses
 import codecs
 import webbrowser
@@ -26,7 +29,7 @@ def oauth_required(f):
     return wrapped_method
 
 
-def open_editor(data=u''):
+def open_editor(data=''):
     """
     Open a temporary file using the system's default editor.
 
@@ -50,14 +53,14 @@ def open_editor(data=u''):
         # Open a second file object to read. This appears to be necessary in
         # order to read the changes made by some editors (gedit). w+ mode does
         # not work!
-        with codecs.open(fp.name, 'rb', 'utf-8') as fp2:
-            text = u''.join(line for line in fp2 if not line.startswith('#'))
+        with codecs.open(fp.name, 'utf-8') as fp2:
+            text = ''.join(line for line in fp2 if not line.startswith('#'))
             text = text.rstrip()
 
     return text
 
 
-def open_browser(url):
+def open_browser(url, display=True):
     """
     Open the given url using the default webbrowser. The preferred browser can
     specified with the $BROWSER environment variable. If not specified, python
@@ -77,8 +80,7 @@ def open_browser(url):
     are not detected here.
     """
 
-    # if check_browser_display():
-    if True:
+    if display:
         command = "import webbrowser; webbrowser.open_new_tab('%s')" % url
         args = [sys.executable, '-c', command]
         with open(os.devnull, 'ab+', 0) as null:
@@ -113,16 +115,16 @@ def strip_textpad(text):
         return text
 
     # Trivial case where the textbox is only one line long.
-    if u'\n' not in text:
+    if '\n' not in text:
         return text.rstrip()
 
     # Allow one space at the end of the line. If there is more than one space,
     # assume that a newline operation was intended by the user
-    stack, current_line = [], u''
-    for line in text.split(u'\n'):
-        if line.endswith(u'  '):
+    stack, current_line = [], ''
+    for line in text.split('\n'):
+        if line.endswith('  '):
             stack.append(current_line + line.rstrip())
-            current_line = u''
+            current_line = ''
         else:
             current_line += line
     stack.append(current_line)
@@ -134,7 +136,7 @@ def strip_textpad(text):
         else:
             break
 
-    out = u'\n'.join(stack)
+    out = '\n'.join(stack)
     return out
 
 
