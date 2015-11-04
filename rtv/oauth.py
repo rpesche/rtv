@@ -35,7 +35,6 @@ class OAuthHandler(web.RequestHandler):
                     error=self.error)
 
         # Stop IOLoop if using a background browser such as firefox
-        # if check_browser_display():
         if self.display:
             ioloop.IOLoop.current().stop()
 
@@ -85,7 +84,7 @@ class OAuthHelper(object):
             state, scope=self.config['oauth_scope'], refreshable=True)
 
         # Open the browser and wait for the user to authorize the app
-        if not self.term.display:
+        if self.term.display:
             with self.term.loader(message='Waiting for authorization'):
                 open_browser(authorize_url, self.term.display)
                 ioloop.IOLoop.current().start()
