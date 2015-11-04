@@ -4,6 +4,7 @@ import curses
 import threading
 import webbrowser
 from curses import textpad, ascii
+from contextlib import contextmanager
 
 import six
 from kitchen.text.display import textual_width_chop
@@ -184,7 +185,7 @@ class Terminal(object):
         for index, line in enumerate(message, start=1):
             self.add_line(window, line, index, 1)
         window.refresh()
-        ch = self.stdscr.getch()
+        ch = six.unichr(self.stdscr.getch())
 
         window.clear()
         del window
@@ -192,7 +193,7 @@ class Terminal(object):
 
         return ch
 
-    def text_input(self, window, allow_resize=True):
+    def text_input(self, window, allow_resize=False):
         """
         Transform a window into a text box that will accept user input and loop
         until an escape sequence is entered.
@@ -236,30 +237,33 @@ class Terminal(object):
         curses.curs_set(0)
         return strip_textpad(out)
 
-    def prompt_input(self, prompt, hide=False):
+    def prompt_input(self, prompt, key=False):
         """
-        Display a prompt where the user can enter text at the bottom of the
+        Display a text prompt at the bottom of the screen.
 
-        screen. Set hide to True to make the input text invisible.
+        Params:
+            prompt (string): Text prompt that will be displayed
+            key (bool): If true, grab a single keystroke instead of a full
+                        string. This can be faster than pressing enter for
+                        single key prompts (e.g. y/n?)
         """
 
-        # TODO: This is probably broken for unicode
-        attr = curses.A_BOLD | Color.CYAN
         n_rows, n_cols = self.stdscr.getmaxyx()
-
-        if hide:
-            prompt += ' ' * (n_cols - len(prompt) - 1)
-            self.stdscr.addstr(n_rows-1, 0, prompt, attr)
-            out = self.stdscr.getstr(n_rows-1, 1)
+        attr = curses.A_BOLD | Color.CYAN
+        prompt = self.clean(prompt, n_cols - 1)
+        window = self.stdscr.derwin(
+            1, n_cols - len(prompt), n_rows - 1, len(prompt))
+        window.attrset(attr)
+        self.add_line(self.stdscr, prompt, n_rows-1, 0, attr)
+        self.stdscr.refresh()
+        if key:
+            curses.curs_set(1)
+            ch = self.stdscr.getch()
+            text = six.unichr(ch) if ch != self.ESCAPE else None
+            curses.curs_set(0)
         else:
-            self.stdscr.addstr(n_rows - 1, 0, prompt, attr)
-            self.stdscr.refresh()
-            subwin = self.stdscr.derwin(1, n_cols - len(prompt),
-                                        n_rows - 1, len(prompt))
-            subwin.attrset(attr)
-            out = self.text_input(subwin)
-
-        return out
+            text = self.text_input(window)
+        return text
 
 
 class LoadScreen(object):
@@ -387,28 +391,54 @@ class Color(object):
         return levels[level % len(levels)]
 
 
-def curses_session(func):
+@contextmanager
+def curses_session():
+    """
+    Setup terminal and initialize curses. Most of this copied from
+    curses.wrapper in order to convert the wrapper into a context manager.
+    """
 
-    def wrapped():
-        stdscr = curses.wrapper(func)
-
+    try:
         # Curses must wait for some time after the Escape key is pressed to
         # check if it is the beginning of an escape sequence indicating a
         # special key. The default wait time is 1 second, which means that
-        # getch() will not return the escape key (27) until a full second
-        # after it has been pressed.
-        # Turn this down to 25 ms, which is close to what VIM uses.
         # http://stackoverflow.com/questions/27372068
         os.environ['ESCDELAY'] = '25'
+
+        # Initialize curses
+        stdscr = curses.initscr()
+
+        # Turn off echoing of keys, and enter cbreak mode, where no buffering
+        # is performed on keyboard input
+        curses.noecho()
+        curses.cbreak()
+
+        # In keypad mode, escape sequences for special keys (like the cursor
+        # keys) will be interpreted and a special value like curses.KEY_LEFT
+        # will be returned
+        stdscr.keypad(1)
+
+        # Start color, too.  Harmless if the terminal doesn't have color; user
+        # can test with has_color() later on.  The try/catch works around a
+        # minor bit of over-conscientiousness in the curses module -- the error
+        # return from C start_color() is ignorable.
+        try:
+            curses.start_color()
+        except:
+            pass
 
         # Hide the blinking cursor
         curses.curs_set(0)
 
         Color.init()
 
-        return stdscr
-    return wrapped
+        yield stdscr
 
-
+    finally:
+        if 'stdscr' in locals() and stdscr is not None:
+            stdscr.keypad(0)
+            curses.echo()
+            curses.nocbreak()
+            curses.endwin()
 
 

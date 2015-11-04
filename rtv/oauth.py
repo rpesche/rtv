@@ -5,8 +5,8 @@ from praw.errors import OAuthAppRequired, OAuthInvalidToken
 from tornado import gen, ioloop, web, httpserver
 from concurrent.futures import ThreadPoolExecutor
 
-from .terminal import CursesBase
-from .helpers import check_browser_display, open_browser
+from .terminal import Terminal
+from .helpers import open_browser
 
 
 class OAuthHandler(web.RequestHandler):
@@ -22,11 +22,12 @@ class OAuthHandler(web.RequestHandler):
                     error=self.error)
 
         # Stop IOLoop if using a background browser such as firefox
-        if check_browser_display():
+        # if check_browser_display():
+        if True:
             ioloop.IOLoop.current().stop()
 
 
-class OAuthTool(CursesBase):
+class OAuthTool(Terminal):
 
     def __init__(self, stdscr, reddit, config):
 
@@ -46,7 +47,7 @@ class OAuthTool(CursesBase):
             config['oauth_redirect_uri'])
 
         # Reddit's mobile website works better on terminal browsers
-        if not check_browser_display():
+        if not self.display:
             if '.compact' not in self.reddit.config.API_PATHS['authorize']:
                 self.reddit.config.API_PATHS['authorize'] += '.compact'
 
@@ -68,7 +69,7 @@ class OAuthTool(CursesBase):
             unique_id, scope=self.config['oauth_scope'], refreshable=True)
 
         # Open the browser and wait for the user to authorize the app
-        if check_browser_display():
+        if not self.display:
             with self.loader(message='Waiting for authorization'):
                 open_browser(authorize_url)
                 ioloop.IOLoop.current().start()

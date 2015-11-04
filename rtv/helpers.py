@@ -77,7 +77,8 @@ def open_browser(url):
     are not detected here.
     """
 
-    if check_browser_display():
+    # if check_browser_display():
+    if True:
         command = "import webbrowser; webbrowser.open_new_tab('%s')" % url
         args = [sys.executable, '-c', command]
         with open(os.devnull, 'ab+', 0) as null:

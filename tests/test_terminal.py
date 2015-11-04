@@ -43,58 +43,65 @@ def test_terminal_clean(terminal):
 
     if terminal.config['ascii']:
         # unicode returns ascii
-        text = terminal.clean(u'hello ❤')
+        text = terminal.clean('hello ❤')
         assert isinstance(text, six.binary_type)
-        assert text.decode('ascii') == u'hello ?'
+        assert text.decode('ascii') == 'hello ?'
+
         # utf-8 returns ascii
-        text = terminal.clean(u'hello ❤'.encode('utf-8'))
+        text = terminal.clean('hello ❤'.encode('utf-8'))
         assert isinstance(text, six.binary_type)
-        assert text.decode('ascii') == u'hello ?'
+        assert text.decode('ascii') == 'hello ?'
+
         # ascii returns ascii
-        text = terminal.clean(u'hello'.encode('ascii'))
+        text = terminal.clean('hello'.encode('ascii'))
         assert isinstance(text, six.binary_type)
-        assert text.decode('ascii') == u'hello'
+        assert text.decode('ascii') == 'hello'
     else:
         # unicode returns utf-8
-        text = terminal.clean(u'hello ❤')
+        text = terminal.clean('hello ❤')
         assert isinstance(text, six.binary_type)
-        assert text.decode('utf-8') == u'hello ❤'
+        assert text.decode('utf-8') == 'hello ❤'
+
         # utf-8 returns utf-8
-        text = terminal.clean(u'hello ❤'.encode('utf-8'))
+        text = terminal.clean('hello ❤'.encode('utf-8'))
         assert isinstance(text, six.binary_type)
-        assert text.decode('utf-8') == u'hello ❤'
+        assert text.decode('utf-8') == 'hello ❤'
+
         # ascii returns utf-8
-        text = terminal.clean(u'hello'.encode('ascii'))
+        text = terminal.clean('hello'.encode('ascii'))
         assert isinstance(text, six.binary_type)
-        assert text.decode('utf-8') == u'hello'
+        assert text.decode('utf-8') == 'hello'
 
 
 def test_terminal_clean_ncols(terminal):
 
     if not terminal.config['ascii']:
-        text = terminal.clean(u'hello', n_cols=5)
-        assert text.decode('utf-8') == u'hello'
-        text = terminal.clean(u'hello', n_cols=4)
-        assert text.decode('utf-8') == u'hell'
-        text = terminal.clean(u'ｈｅｌｌｏ', n_cols=10)
-        assert text.decode('utf-8') == u'ｈｅｌｌｏ'
-        text = terminal.clean(u'ｈｅｌｌｏ', n_cols=9)
-        assert text.decode('utf-8') == u'ｈｅｌｌ'
+        text = terminal.clean('hello', n_cols=5)
+        assert text.decode('utf-8') == 'hello'
+
+        text = terminal.clean('hello', n_cols=4)
+        assert text.decode('utf-8') == 'hell'
+
+        text = terminal.clean('ｈｅｌｌｏ', n_cols=10)
+        assert text.decode('utf-8') == 'ｈｅｌｌｏ'
+
+        text = terminal.clean('ｈｅｌｌｏ', n_cols=9)
+        assert text.decode('utf-8') == 'ｈｅｌｌ'
 
 
 def test_terminal_add_line(terminal, stdscr):
 
-    terminal.add_line(stdscr, u'hello')
-    assert stdscr.addstr.called_with(0, 0, u'hello'.encode('ascii'))
+    terminal.add_line(stdscr, 'hello')
+    assert stdscr.addstr.called_with(0, 0, 'hello'.encode('ascii'))
     stdscr.reset_mock()
 
     # Text will be drawn, but cut off to fit on the screen
-    terminal.add_line(stdscr, u'hello', row=3, col=75)
-    assert stdscr.addstr.called_with((3, 75, u'hell'.encode('ascii')))
+    terminal.add_line(stdscr, 'hello', row=3, col=75)
+    assert stdscr.addstr.called_with((3, 75, 'hell'.encode('ascii')))
     stdscr.reset_mock()
 
     # Outside of screen bounds, don't even try to draw the text
-    terminal.add_line(stdscr, u'hello', col=79)
+    terminal.add_line(stdscr, 'hello', col=79)
     assert stdscr.addstr.assert_not_called()
     stdscr.reset_mock()
 
@@ -122,13 +129,38 @@ def test_text_input(terminal, stdscr):
 
     stdscr.nlines = 1
     with mock.patch('curses.curs_set'):
+
         # Text will be wrong because stdscr.inch() is not implemented
         # But we can at least tell if text was captured or not
         stdscr.getch.side_effect = ['h', 'i', '!', terminal.RETURN]
         assert isinstance(terminal.text_input(stdscr), six.text_type)
+
         stdscr.getch.side_effect = ['b', 'y', 'e', terminal.ESCAPE]
         assert terminal.text_input(stdscr) is None
+
         stdscr.getch.side_effect = ['h', curses.KEY_RESIZE, terminal.RETURN]
         assert terminal.text_input(stdscr, allow_resize=True) is not None
+
         stdscr.getch.side_effect = ['h', curses.KEY_RESIZE, terminal.RETURN]
         assert terminal.text_input(stdscr, allow_resize=False) is None
+
+def test_prompt_input(terminal, stdscr):
+
+    window = stdscr.derwin()
+    with mock.patch('curses.curs_set'):
+
+        window.getch.side_effect = ['h', 'e', 'l', 'l', 'o', terminal.RETURN]
+        assert isinstance(terminal.prompt_input('hi'), six.text_type)
+
+        stdscr.addstr.assert_called_with(39, 0, 'hi'.encode('ascii'), 2097152)
+        assert window.nlines == 1
+        assert window.ncols == 78
+
+        window.getch.side_effect = ['b', 'y', 'e', terminal.ESCAPE]
+        assert terminal.prompt_input('hi') is None
+
+        window.getch.side_effect = ['h', 'e', 'l', 'l', 'o', terminal.RETURN]
+        assert terminal.prompt_input('hi', key=True) == 'h'
+
+        window.getch.side_effect = ['h', 'e', 'l', 'l', 'o', terminal.RETURN]
+        assert terminal.prompt_input('hi', key=True) == 'h'

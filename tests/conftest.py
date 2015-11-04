@@ -19,19 +19,29 @@ class MockStdscr(mock.MagicMock):
 
     def derwin(self, *args):
         """
+        derwin()
         derwin(begin_y, begin_x)
         derwin(nlines, ncols, begin_y, begin_x)
         """
 
-        if len(args) == 2:
+        if 'subwin' not in dir(self):
+            self.attach_mock(MockStdscr(), 'subwin')
+
+        if len(args) == 0:
+            nlines = self.nlines
+            ncols = self.ncols
+        elif len(args) == 2:
             nlines = self.nlines - args[0]
             ncols = self.ncols - args[1]
         else:
             nlines = min(self.nlines - args[2], args[0])
             ncols = min(self.ncols - args[3], args[1])
-        subwin = MockStdscr(nlines=nlines, ncols=ncols, y=0, x=0)
-        self.attach_mock(subwin, 'subwin')
-        return subwin
+
+        self.subwin.nlines = nlines
+        self.subwin.ncols = ncols
+        self.subwin.x = 0
+        self.subwin.y = 0
+        return self.subwin
 
 
 @pytest.fixture(scope='module', params=[{'ascii': True}, {'ascii': False}],
@@ -42,8 +52,7 @@ def config(request):
 
 @pytest.fixture(scope='function')
 def stdscr():
-    return MockStdscr(nlines=40, ncols=80, y=0, x=0)
-
+    return MockStdscr(nlines=40, ncols=80, x=0, y=0)
 
 @pytest.fixture(scope='function')
 def terminal(stdscr, config):
