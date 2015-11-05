@@ -8,6 +8,7 @@ from rtv.config import Config
 from rtv.terminal import Terminal
 from rtv.oauth import OAuthHelper
 
+
 try:
     from unittest import mock
 except ImportError:
@@ -54,9 +55,12 @@ class MockStdscr(mock.MagicMock):
         return self.subwin
 
 
-@pytest.fixture(params=[{'ascii': True}, {'ascii': False}])
+@pytest.yield_fixture(params=[{'ascii': True}, {'ascii': False}])
 def config(request):
-    return Config(**request.param)
+    out = Config(**request.param)
+    with mock.patch.object(out, 'save_refresh_token', autospec=True), \
+            mock.patch.object(out, 'save_history', autospec=True):
+        yield out
 
 
 @pytest.fixture()
@@ -69,9 +73,12 @@ def terminal(stdscr, config):
     return Terminal(stdscr, ascii=config['ascii'])
 
 
-@pytest.fixture()
+@pytest.yield_fixture()
 def reddit():
-    return praw.Reddit(user_agent='rtv test suite', decode_html_entities=False)
+    out = praw.Reddit(user_agent='rtv test suite', decode_html_entities=False)
+    with mock.patch.object(out, 'refresh_access_information', autospec=True), \
+            mock.patch.object(out, 'get_access_information', autospec=True):
+        yield out
 
 
 @pytest.fixture()

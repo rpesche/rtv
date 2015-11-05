@@ -23,16 +23,16 @@ class OAuthHandler(web.RequestHandler):
         error: If an error occurred, it will be placed here.
     """
 
-    display = None
-    state, code, error = None, None, None
+    def initialize(self, display=None, params=None):
+        self.display = display
+        self.params = params
 
     def get(self):
-        self.state = self.get_argument('state', default='')
-        self.code = self.get_argument('code', default='')
-        self.error = self.get_argument('error', default='')
+        self.params['state'] = self.get_argument('state', default=None)
+        self.params['code'] = self.get_argument('code', default=None)
+        self.params['error'] = self.get_argument('error', default=None)
 
-        self.render('index.html', state=self.state, code=self.code,
-                    error=self.error)
+        self.render('index.html', **self.params)
 
         # Stop IOLoop if using a background browser such as firefox
         if self.display:
@@ -48,10 +48,12 @@ class OAuthHelper(object):
         self.config = config
 
         self.http_server = None
+        self.params = {'state': None, 'code': None, 'error': None}
 
         # Initialize Tornado webapp
-        OAuthHandler.display = self.term.display
-        routes = [('/', OAuthHandler)]
+        # Pass a mutable params object so the request handler can modify it
+        kwargs = {'display': self.term.display, 'params': self.params}
+        routes = [('/', OAuthHandler, kwargs)]
         self.callback_app = web.Application(
             routes, template_path=self.config['template_path'])
 
@@ -67,12 +69,17 @@ class OAuthHelper(object):
 
     def authorize(self):
 
+        self.params.update(state=None, code=None, error=None)
+
         # If we already have a token, request new access credentials
         if self.config.refresh_token:
             with self.term.loader(message='Logging in'):
                 self.reddit.refresh_access_information(
                     self.config.refresh_token)
                 return
+
+        # https://github.com/tornadoweb/tornado/issues/1420
+        io = ioloop.IOLoop.current()
 
         # Start the authorization callback server
         if self.http_server is None:
@@ -83,46 +90,57 @@ class OAuthHelper(object):
         authorize_url = self.reddit.get_authorize_url(
             state, scope=self.config['oauth_scope'], refreshable=True)
 
-        # Open the browser and wait for the user to authorize the app
         if self.term.display:
+            # Open a background browser (e.g. firefox) which is non-blocking.
+            # Stop the iloop when the user hits the auth callback, at which
+            # point we continue and check the callback params.
             with self.term.loader(message='Waiting for authorization'):
                 open_browser(authorize_url, self.term.display)
-                ioloop.IOLoop.current().start()
+                io.start()
         else:
+            # Open the terminal webbrowser in a background thread and wait
+            # while for the user to close the process. Once the process is
+            # closed, the iloop is stopped and we can check if the user has
+            # hit the callback URL.
             with self.term.loader(delay=0, message='Redirecting to reddit'):
-                time.sleep(1)  # User feedback
-            ioloop.IOLoop.current().add_callback(self._open_authorize_url,
-                                                 authorize_url)
-            ioloop.IOLoop.current().start()
+                # This load message exists to provide user feedback
+                time.sleep(1)
+            io.add_callback(self._open_browser_in_background, authorize_url)
+            io.start()
 
-        if OAuthHandler.error == 'access_denied':
+        if not self.params['code']:
+            self.term.show_notification('Missing code')
+            return
+        elif self.params['error'] == 'access_denied':
             self.term.show_notification('Declined access')
             return
-        elif OAuthHandler.error is not None:
+        elif self.params['error']:
             self.term.show_notification('Authentication error')
             return
-        elif state != OAuthHandler.state:
+        elif self.params['state'] != state:
             self.term.show_notification('UUID mismatch')
             return
 
         try:
             with self.term.loader(message='Logging in'):
-                info = self.reddit.get_access_information(OAuthHandler.code)
-                self.config.refresh_token = info['refresh_token']
-                if self.config['persistent']:
-                    self.config.save_refresh_token()
+                info = self.reddit.get_access_information(self.params['code'])
         except (OAuthAppRequired, OAuthException):
             self.term.show_notification('Invalid OAuth data')
-        else:
-            message = 'Welcome {}!'.format(self.reddit.user.name)
-            self.term.show_notification(message)
+            return
+
+        message = 'Welcome {}!'.format(self.reddit.user.name)
+        self.term.show_notification(message)
+
+        self.config.refresh_token = info['refresh_token']
+        if self.config['persistent']:
+            self.config.save_refresh_token()
 
     def clear_oauth_data(self):
         self.reddit.clear_authentication()
         self.config.clear_refresh_token()
 
     @gen.coroutine
-    def _open_authorize_url(self, url):
+    def _open_browser_in_background(self, url):
         with ThreadPoolExecutor(max_workers=1) as executor:
             yield executor.submit(open_browser, url, self.term.display)
         ioloop.IOLoop.current().stop()
