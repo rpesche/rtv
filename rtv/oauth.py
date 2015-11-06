@@ -137,7 +137,7 @@ class OAuthHelper(object):
 
     def clear_oauth_data(self):
         self.reddit.clear_authentication()
-        self.config.clear_refresh_token()
+        self.config.delete_refresh_token()
 
     @gen.coroutine
     def _open_browser_in_background(self, url):

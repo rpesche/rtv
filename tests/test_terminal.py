@@ -46,57 +46,65 @@ def test_terminal_properties(terminal, config):
     assert isinstance(terminal.loader, LoadScreen)
 
 
-def test_terminal_clean(terminal):
+def test_terminal_clean_ascii(terminal):
 
-    if terminal.ascii:
-        # unicode returns ascii
-        text = terminal.clean('hello ❤')
-        assert isinstance(text, six.binary_type)
-        assert text.decode('ascii') == 'hello ?'
+    terminal.ascii = True
 
-        # utf-8 returns ascii
-        text = terminal.clean('hello ❤'.encode('utf-8'))
-        assert isinstance(text, six.binary_type)
-        assert text.decode('ascii') == 'hello ?'
+    # unicode returns ascii
+    text = terminal.clean('hello ❤')
+    assert isinstance(text, six.binary_type)
+    assert text.decode('ascii') == 'hello ?'
 
-        # ascii returns ascii
-        text = terminal.clean('hello'.encode('ascii'))
-        assert isinstance(text, six.binary_type)
-        assert text.decode('ascii') == 'hello'
-    else:
-        # unicode returns utf-8
-        text = terminal.clean('hello ❤')
-        assert isinstance(text, six.binary_type)
-        assert text.decode('utf-8') == 'hello ❤'
+    # utf-8 returns ascii
+    text = terminal.clean('hello ❤'.encode('utf-8'))
+    assert isinstance(text, six.binary_type)
+    assert text.decode('ascii') == 'hello ?'
 
-        # utf-8 returns utf-8
-        text = terminal.clean('hello ❤'.encode('utf-8'))
-        assert isinstance(text, six.binary_type)
-        assert text.decode('utf-8') == 'hello ❤'
+    # ascii returns ascii
+    text = terminal.clean('hello'.encode('ascii'))
+    assert isinstance(text, six.binary_type)
+    assert text.decode('ascii') == 'hello'
 
-        # ascii returns utf-8
-        text = terminal.clean('hello'.encode('ascii'))
-        assert isinstance(text, six.binary_type)
-        assert text.decode('utf-8') == 'hello'
+
+def test_terminal_clean_unicode(terminal):
+
+    terminal.ascii = False
+
+    # unicode returns utf-8
+    text = terminal.clean('hello ❤')
+    assert isinstance(text, six.binary_type)
+    assert text.decode('utf-8') == 'hello ❤'
+
+    # utf-8 returns utf-8
+    text = terminal.clean('hello ❤'.encode('utf-8'))
+    assert isinstance(text, six.binary_type)
+    assert text.decode('utf-8') == 'hello ❤'
+
+    # ascii returns utf-8
+    text = terminal.clean('hello'.encode('ascii'))
+    assert isinstance(text, six.binary_type)
+    assert text.decode('utf-8') == 'hello'
 
 
 def test_terminal_clean_ncols(terminal):
 
-    if not terminal.ascii:
-        text = terminal.clean('hello', n_cols=5)
-        assert text.decode('utf-8') == 'hello'
+    text = terminal.clean('hello', n_cols=5)
+    assert text.decode('utf-8') == 'hello'
 
-        text = terminal.clean('hello', n_cols=4)
-        assert text.decode('utf-8') == 'hell'
+    text = terminal.clean('hello', n_cols=4)
+    assert text.decode('utf-8') == 'hell'
 
-        text = terminal.clean('ｈｅｌｌｏ', n_cols=10)
-        assert text.decode('utf-8') == 'ｈｅｌｌｏ'
+    text = terminal.clean('ｈｅｌｌｏ', n_cols=10)
+    assert text.decode('utf-8') == 'ｈｅｌｌｏ'
 
-        text = terminal.clean('ｈｅｌｌｏ', n_cols=9)
-        assert text.decode('utf-8') == 'ｈｅｌｌ'
+    text = terminal.clean('ｈｅｌｌｏ', n_cols=9)
+    assert text.decode('utf-8') == 'ｈｅｌｌ'
 
 
-def test_terminal_add_line(terminal, stdscr):
+@pytest.mark.parametrize('ascii', [True, False])
+def test_terminal_add_line(terminal, stdscr, ascii):
+
+    terminal.ascii = ascii
 
     terminal.add_line(stdscr, 'hello')
     assert stdscr.addstr.called_with(0, 0, 'hello'.encode('ascii'))
@@ -113,7 +121,10 @@ def test_terminal_add_line(terminal, stdscr):
     stdscr.reset_mock()
 
 
-def test_show_notification(terminal, stdscr):
+@pytest.mark.parametrize('ascii', [True, False])
+def test_show_notification(terminal, stdscr, ascii):
+
+    terminal.ascii = ascii
 
     # The whole message should fit in 40x80
     text = HELP.strip().splitlines()
@@ -132,50 +143,54 @@ def test_show_notification(terminal, stdscr):
     assert stdscr.subwin.addstr.call_count == 13
 
 
-def test_text_input(terminal, stdscr):
+@pytest.mark.parametrize('ascii', [True, False])
+def test_text_input(terminal, stdscr, ascii):
 
+    terminal.ascii = ascii
     stdscr.nlines = 1
-    with mock.patch('curses.curs_set'):
 
-        # Text will be wrong because stdscr.inch() is not implemented
-        # But we can at least tell if text was captured or not
-        stdscr.getch.side_effect = ['h', 'i', '!', terminal.RETURN]
-        assert isinstance(terminal.text_input(stdscr), six.text_type)
+    # Text will be wrong because stdscr.inch() is not implemented
+    # But we can at least tell if text was captured or not
+    stdscr.getch.side_effect = ['h', 'i', '!', terminal.RETURN]
+    assert isinstance(terminal.text_input(stdscr), six.text_type)
 
-        stdscr.getch.side_effect = ['b', 'y', 'e', terminal.ESCAPE]
-        assert terminal.text_input(stdscr) is None
+    stdscr.getch.side_effect = ['b', 'y', 'e', terminal.ESCAPE]
+    assert terminal.text_input(stdscr) is None
 
-        stdscr.getch.side_effect = ['h', curses.KEY_RESIZE, terminal.RETURN]
-        assert terminal.text_input(stdscr, allow_resize=True) is not None
+    stdscr.getch.side_effect = ['h', curses.KEY_RESIZE, terminal.RETURN]
+    assert terminal.text_input(stdscr, allow_resize=True) is not None
 
-        stdscr.getch.side_effect = ['h', curses.KEY_RESIZE, terminal.RETURN]
-        assert terminal.text_input(stdscr, allow_resize=False) is None
+    stdscr.getch.side_effect = ['h', curses.KEY_RESIZE, terminal.RETURN]
+    assert terminal.text_input(stdscr, allow_resize=False) is None
 
 
-def test_prompt_input(terminal, stdscr):
+@pytest.mark.parametrize('ascii', [True, False])
+def test_prompt_input(terminal, stdscr, ascii):
 
+    terminal.ascii = ascii
     window = stdscr.derwin()
-    with mock.patch('curses.curs_set'):
 
-        window.getch.side_effect = ['h', 'e', 'l', 'l', 'o', terminal.RETURN]
-        assert isinstance(terminal.prompt_input('hi'), six.text_type)
+    window.getch.side_effect = ['h', 'e', 'l', 'l', 'o', terminal.RETURN]
+    assert isinstance(terminal.prompt_input('hi'), six.text_type)
 
-        stdscr.addstr.assert_called_with(39, 0, 'hi'.encode('ascii'), 2097152)
-        assert window.nlines == 1
-        assert window.ncols == 78
+    stdscr.addstr.assert_called_with(39, 0, 'hi'.encode('ascii'), 2097152)
+    assert window.nlines == 1
+    assert window.ncols == 78
 
-        window.getch.side_effect = ['b', 'y', 'e', terminal.ESCAPE]
-        assert terminal.prompt_input('hi') is None
+    window.getch.side_effect = ['b', 'y', 'e', terminal.ESCAPE]
+    assert terminal.prompt_input('hi') is None
 
-        stdscr.getch.side_effect = ['b', 'e', 'l', 'l', 'o', terminal.RETURN]
-        assert terminal.prompt_input('hi', key=True) == 'b'
+    stdscr.getch.side_effect = ['b', 'e', 'l', 'l', 'o', terminal.RETURN]
+    assert terminal.prompt_input('hi', key=True) == 'b'
 
-        stdscr.getch.side_effect = [terminal.ESCAPE, 'e', 'l', 'l', 'o']
-        assert terminal.prompt_input('hi', key=True) is None
+    stdscr.getch.side_effect = [terminal.ESCAPE, 'e', 'l', 'l', 'o']
+    assert terminal.prompt_input('hi', key=True) is None
 
 
-def test_load_screen(terminal, stdscr):
+@pytest.mark.parametrize('ascii', [True, False])
+def test_load_screen(terminal, stdscr, ascii):
 
+    terminal.ascii = ascii
     window = stdscr.derwin()
 
     # Ensure the thread is properly started/stopped
@@ -205,66 +220,47 @@ def test_load_screen(terminal, stdscr):
     window.reset_mock()
 
 
-def test_color():
+def test_color(stdscr):
 
     colors = ['RED', 'GREEN', 'YELLOW', 'BLUE', 'MAGENTA', 'CYAN', 'WHITE']
 
-    with mock.patch('curses.use_default_colors') as default_colors, \
-            mock.patch('curses.color_pair') as color_pair, \
-            mock.patch('curses.init_pair'):
-        color_pair.return_value = 23
+    # Check that all colors start with the default value
+    for color in colors:
+        assert getattr(Color, color) == curses.A_NORMAL
 
-        # Check that all colors start with the default value
-        for color in colors:
-            assert getattr(Color, color) == curses.A_NORMAL
+    Color.init()
+    assert curses.use_default_colors.called
 
-        Color.init()
-        default_colors.assert_called()
-
-        # Check that all colors are populated
-        for color in colors:
-            assert getattr(Color, color) == 23
+    # Check that all colors are populated
+    for color in colors:
+        assert getattr(Color, color) == 23
 
 
 def test_curses_session(stdscr):
 
-    # Couldn't find a way to patch all of curses at once!
-    with mock.patch('curses.initscr') as initscr, \
-            mock.patch('curses.endwin') as endwin, \
-            mock.patch('curses.noecho'), \
-            mock.patch('curses.echo'), \
-            mock.patch('curses.nocbreak'), \
-            mock.patch('curses.cbreak'), \
-            mock.patch('curses.start_color'), \
-            mock.patch('curses.curs_set'), \
-            mock.patch('curses.use_default_colors'), \
-            mock.patch('curses.color_pair'), \
-            mock.patch('curses.init_pair'):
-        initscr.return_value = stdscr
+    # Normal setup and cleanup
+    with curses_session():
+        pass
+    assert curses.initscr.called
+    assert curses.endwin.called
+    curses.initscr.reset_mock()
+    curses.endwin.reset_mock()
 
-        # Normal setup and cleanup
+    # Ensure cleanup runs if an error occurs
+    with pytest.raises(KeyboardInterrupt):
+        with curses_session():
+            raise KeyboardInterrupt()
+    assert curses.initscr.called
+    assert curses.endwin.called
+    curses.initscr.reset_mock()
+    curses.endwin.reset_mock()
+
+    # But cleanup shouldn't run if stdscr was never instantiated
+    curses.initscr.side_effect = KeyboardInterrupt()
+    with pytest.raises(KeyboardInterrupt):
         with curses_session():
             pass
-        initscr.assert_called()
-        initscr.reset_mock()
-        endwin.assert_called()
-        endwin.reset_mock()
-
-        # Ensure cleanup runs if an error occurs
-        with pytest.raises(KeyboardInterrupt):
-            with curses_session():
-                raise KeyboardInterrupt()
-        initscr.assert_called()
-        initscr.reset_mock()
-        endwin.assert_called()
-        endwin.reset_mock()
-
-        # But cleanup shouldn't run if stdscr was never instantiated
-        initscr.side_effect = KeyboardInterrupt()
-        with pytest.raises(KeyboardInterrupt):
-            with curses_session():
-                pass
-        initscr.assert_called()
-        initscr.reset_mock()
-        endwin.assert_not_called()
-        endwin.reset_mock()
+    assert curses.initscr.called
+    assert not curses.endwin.called
+    curses.initscr.reset_mock()
+    curses.endwin.reset_mock()

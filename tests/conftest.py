@@ -3,6 +3,8 @@ from __future__ import unicode_literals
 
 import praw
 import pytest
+import curses
+from functools import partial
 
 from rtv.config import Config
 from rtv.terminal import Terminal
@@ -13,6 +15,8 @@ try:
     from unittest import mock
 except ImportError:
     import mock
+
+patch = partial(mock.patch, autospec=True)
 
 
 class MockStdscr(mock.MagicMock):
@@ -55,32 +59,45 @@ class MockStdscr(mock.MagicMock):
         return self.subwin
 
 
-@pytest.yield_fixture(params=[{'ascii': True}, {'ascii': False}])
-def config(request):
-    out = Config(**request.param)
-    with mock.patch.object(out, 'save_refresh_token', autospec=True), \
-            mock.patch.object(out, 'save_history', autospec=True):
-        yield out
+@pytest.yield_fixture()
+def config():
+    with patch('rtv.config.Config.save_refresh_token'), \
+            patch('rtv.config.Config.save_history'):
+        yield Config()
 
 
-@pytest.fixture()
+@pytest.yield_fixture()
 def stdscr():
-    return MockStdscr(nlines=40, ncols=80, x=0, y=0)
-
-
-@pytest.fixture()
-def terminal(stdscr, config):
-    return Terminal(stdscr, ascii=config['ascii'])
+    with patch('curses.initscr'),               \
+            patch('curses.endwin'),             \
+            patch('curses.noecho'),             \
+            patch('curses.echo'),               \
+            patch('curses.nocbreak'),           \
+            patch('curses.cbreak'),             \
+            patch('curses.start_color'),        \
+            patch('curses.curs_set'),           \
+            patch('curses.use_default_colors'), \
+            patch('curses.color_pair'),         \
+            patch('curses.init_pair'):
+        out = MockStdscr(nlines=40, ncols=80, x=0, y=0)
+        curses.initscr.return_value = out
+        curses.color_pair.return_value = 23
+        yield out
 
 
 @pytest.yield_fixture()
 def reddit():
-    out = praw.Reddit(user_agent='rtv test suite', decode_html_entities=False)
-    with mock.patch.object(out, 'refresh_access_information', autospec=True), \
-            mock.patch.object(out, 'get_access_information', autospec=True):
-        yield out
+    with patch('praw.Reddit.refresh_access_information'), \
+            patch('praw.Reddit.get_access_information'):
+        yield praw.Reddit(user_agent='rtv test suite',
+                          decode_html_entities=False)
 
 
-@pytest.fixture()
+@pytest.yield_fixture()
+def terminal(stdscr, config):
+    yield Terminal(stdscr, ascii=config['ascii'])
+
+
+@pytest.yield_fixture()
 def oauth(reddit, terminal, config):
-    return OAuthHelper(reddit, terminal, config)
+    yield OAuthHelper(reddit, terminal, config)
