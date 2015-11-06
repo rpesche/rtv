@@ -32,11 +32,12 @@ def test_terminal_properties(terminal, config):
         assert terminal.display is False
 
     terminal._display = None
-    with mock.patch.dict('os.environ', {'DISPLAY': 'term', 'BROWSER': 'w3m'}):
+    with mock.patch.dict('os.environ', {'DISPLAY': ':0', 'BROWSER': 'w3m'}):
         assert terminal.display is False
 
     terminal._display = None
-    with mock.patch.dict('os.environ', {'DISPLAY': 'term', 'BROWSER': ''}):
+    with mock.patch.dict('os.environ', {'DISPLAY': ':0', 'BROWSER': ''}), \
+            mock.patch('webbrowser._tryorder'):
         assert terminal.display is True
 
     assert terminal.get_arrow(None) is not None
