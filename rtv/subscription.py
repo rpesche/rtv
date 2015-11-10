@@ -1,7 +1,7 @@
 import curses
 
 from .content import SubscriptionContent
-from .page import BasePage, Navigator, BaseController
+from .page import Page, Navigator, BaseController
 from .terminal import Color, LoadScreen
 
 
@@ -9,7 +9,7 @@ class SubscriptionController(BaseController):
     character_map = {}
 
 
-class SubscriptionPage(BasePage):
+class SubscriptionPage(Page):
 
     def __init__(self, stdscr, reddit, config, oauth):
 

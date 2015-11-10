@@ -16,6 +16,7 @@ try:
 except ImportError:
     import mock
 
+# Turn on autospec by default for convenience
 patch = partial(mock.patch, autospec=True)
 
 

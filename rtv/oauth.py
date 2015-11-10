@@ -3,12 +3,26 @@ from __future__ import unicode_literals
 
 import time
 import uuid
+from functools import wraps
 
 from praw.errors import OAuthAppRequired, OAuthException
 from tornado import gen, ioloop, web, httpserver
 from concurrent.futures import ThreadPoolExecutor
 
 from .helpers import open_browser
+
+
+def oauth_required(f):
+    """
+    Decorator for Page methods that require the user to be authenticated.
+    """
+    @wraps(f)
+    def wrapped_method(self, *args, **kwargs):
+        if not self.reddit.is_oauth_session():
+            self.show_notification('Not logged in')
+            return
+        return f(self, *args, **kwargs)
+    return wrapped_method
 
 
 class OAuthHandler(web.RequestHandler):

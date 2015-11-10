@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
-from rtv.page import Controller
+from rtv.helpers import Controller
 
 try:
     from unittest import mock

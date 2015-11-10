@@ -5,28 +5,215 @@ import os
 import sys
 import curses
 import codecs
+import inspect
 import webbrowser
 import subprocess
-from functools import wraps
 from datetime import datetime
 from tempfile import NamedTemporaryFile
 
+import six
 from kitchen.text.display import wrap
 
 from .exceptions import ProgramError
 
 
-def oauth_required(f):
+class Navigator(object):
     """
-    Decorator for Page methods that require the user to be authenticated.
+    Handles math behind cursor movement and screen paging.
     """
-    @wraps(f)
-    def wrapped_method(self, *args, **kwargs):
-        if not self.reddit.is_oauth_session():
-            self.show_notification('Not logged in')
-            return
-        return f(self, *args, **kwargs)
-    return wrapped_method
+
+    def __init__(
+            self,
+            valid_page_cb,
+            page_index=0,
+            cursor_index=0,
+            inverted=False):
+
+        self.page_index = page_index
+        self.cursor_index = cursor_index
+        self.inverted = inverted
+        self._page_cb = valid_page_cb
+        self._header_window = None
+        self._content_window = None
+
+    @property
+    def step(self):
+        return 1 if not self.inverted else -1
+
+    @property
+    def position(self):
+        return self.page_index, self.cursor_index, self.inverted
+
+    @property
+    def absolute_index(self):
+        return self.page_index + (self.step * self.cursor_index)
+
+    def move(self, direction, n_windows):
+        "Move the cursor down (positive direction) or up (negative direction)"
+
+        valid, redraw = True, False
+
+        forward = ((direction * self.step) > 0)
+
+        if forward:
+            if self.page_index < 0:
+                if self._is_valid(0):
+                    # Special case - advance the page index if less than zero
+                    self.page_index = 0
+                    self.cursor_index = 0
+                    redraw = True
+                else:
+                    valid = False
+            else:
+                self.cursor_index += 1
+                if not self._is_valid(self.absolute_index):
+                    # Move would take us out of bounds
+                    self.cursor_index -= 1
+                    valid = False
+                elif self.cursor_index >= (n_windows - 1):
+                    # Flip the orientation and reset the cursor
+                    self.flip(self.cursor_index)
+                    self.cursor_index = 0
+                    redraw = True
+        else:
+            if self.cursor_index > 0:
+                self.cursor_index -= 1
+            else:
+                self.page_index -= self.step
+                if self._is_valid(self.absolute_index):
+                    # We have reached the beginning of the page - move the
+                    # index
+                    redraw = True
+                else:
+                    self.page_index += self.step
+                    valid = False  # Revert
+
+        return valid, redraw
+
+    def move_page(self, direction, n_windows):
+        """
+        Move page down (positive direction) or up (negative direction).
+        """
+
+        # top of subreddit/submission page or only one
+        # submission/reply on the screen: act as normal move
+        if (self.absolute_index < 0) | (n_windows == 0):
+            valid, redraw = self.move(direction, n_windows)
+        else:
+            # first page
+            if self.absolute_index < n_windows and direction < 0:
+                self.page_index = -1
+                self.cursor_index = 0
+                self.inverted = False
+
+                # not submission mode: starting index is 0
+                if not self._is_valid(self.absolute_index):
+                    self.page_index = 0
+                valid = True
+            else:
+                # flip to the direction of movement
+                if ((direction > 0) & (self.inverted is True))\
+                   | ((direction < 0) & (self.inverted is False)):
+                    self.page_index += (self.step * (n_windows-1))
+                    self.inverted = not self.inverted
+                    self.cursor_index \
+                        = (n_windows-(direction < 0)) - self.cursor_index
+
+                valid = False
+                adj = 0
+                # check if reached the bottom
+                while not valid:
+                    n_move = n_windows - adj
+                    if n_move == 0:
+                        break
+
+                    self.page_index += n_move * direction
+                    valid = self._is_valid(self.absolute_index)
+                    if not valid:
+                        self.page_index -= n_move * direction
+                        adj += 1
+
+            redraw = True
+
+        return valid, redraw
+
+    def flip(self, n_windows):
+        "Flip the orientation of the page"
+
+        self.page_index += (self.step * n_windows)
+        self.cursor_index = n_windows
+        self.inverted = not self.inverted
+
+    def _is_valid(self, page_index):
+        "Check if a page index will cause entries to fall outside valid range"
+
+        try:
+            self._page_cb(page_index)
+        except IndexError:
+            return False
+        else:
+            return True
+
+
+class Controller(object):
+    """
+    Event handler for triggering functions with curses keypresses.
+
+    Register a keystroke to a class method using the @register decorator.
+    >>> @Controller.register('a', 'A')
+    >>> def func(self, *args)
+    >>>     ...
+
+    Register a default behavior by using `None`.
+    >>> @Controller.register(None)
+    >>> def default_func(self, *args)
+    >>>     ...
+
+    Bind the controller to a class instance and trigger a key. Additional
+    arguments will be passed to the function.
+    >>> controller = Controller(self)
+    >>> controller.trigger('a', *args)
+    """
+
+    character_map = {}
+
+    def __init__(self, instance):
+
+        self.instance = instance
+        # Build a list of parent controllers that follow the object's MRO to
+        # check if any parent controllers have registered the keypress
+        self.parents = inspect.getmro(type(self))[:-1]
+
+    def trigger(self, char, *args, **kwargs):
+
+        if isinstance(char, six.string_types) and len(char) == 1:
+            char = ord(char)
+
+        func = None
+        # Check if the controller (or any of the controller's parents) have
+        # registered a function to the given key
+        for controller in self.parents:
+            if func:
+                break
+            func = controller.character_map.get(char)
+        # If the controller has not registered the key, check if there is a
+        # default function registered
+        for controller in self.parents:
+            if func:
+                break
+            func = controller.character_map.get(None)
+        return func(self.instance, *args, **kwargs) if func else None
+
+    @classmethod
+    def register(cls, *chars):
+        def inner(f):
+            for char in chars:
+                if isinstance(char, six.string_types) and len(char) == 1:
+                    cls.character_map[ord(char)] = f
+                else:
+                    cls.character_map[char] = f
+            return f
+        return inner
 
 
 def open_editor(data=''):
@@ -102,41 +289,6 @@ def wrap_text(text, width):
         # preserve newlines we substitute a list containing an empty string.
         lines = wrap(paragraph, width=width) or ['']
         out.extend(lines)
-    return out
-
-
-def strip_textpad(text):
-    """
-    Attempt to intelligently strip excess whitespace from the output of a
-    curses textpad.
-    """
-
-    if text is None:
-        return text
-
-    # Trivial case where the textbox is only one line long.
-    if '\n' not in text:
-        return text.rstrip()
-
-    # Allow one space at the end of the line. If there is more than one space,
-    # assume that a newline operation was intended by the user
-    stack, current_line = [], ''
-    for line in text.split('\n'):
-        if line.endswith('  '):
-            stack.append(current_line + line.rstrip())
-            current_line = ''
-        else:
-            current_line += line
-    stack.append(current_line)
-
-    # Prune empty lines at the bottom of the textbox.
-    for item in stack[::-1]:
-        if len(item) == 0:
-            stack.pop()
-        else:
-            break
-
-    out = '\n'.join(stack)
     return out
 
 

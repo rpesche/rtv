@@ -4,7 +4,7 @@ import curses
 import requests
 
 from .exceptions import SubredditError, AccountError
-from .page import Navigator, BasePage, BaseController
+from .page import Navigator, Page, BaseController
 from .submission import SubmissionPage
 from .subscription import SubscriptionPage
 from .content import SubredditContent
@@ -17,7 +17,7 @@ class SubredditController(BaseController):
     character_map = {}
 
 
-class SubredditPage(BasePage):
+class SubredditPage(Page):
 
     def __init__(self, stdscr, reddit, config, oauth, name, url=None):
         """
@@ -152,17 +152,15 @@ class SubredditPage(BasePage):
         else:
             title, content = submission_text.split('\n', 1)
 
-        with self.safe_call as s:
-            with self.loader(message='Posting', delay=0):
-                post = self.reddit.submit(sub, title, text=content)
-                time.sleep(2.0)
-            s.catch = False
+        with self.loader(message='Posting', delay=0):
+            post = self.reddit.submit(sub, title, text=content)
+            time.sleep(2.0)
 
+        if self.loader.exception is None:
             # Open the newly created post
             page = SubmissionPage(self.stdscr, self.reddit, self.config,
                                   self.oauth, submission=post)
             page.loop()
-
             self.refresh_content()
 
     @SubredditController.register('s')

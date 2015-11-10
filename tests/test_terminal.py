@@ -199,18 +199,29 @@ def test_load_screen(terminal, stdscr, ascii):
         assert terminal.loader._animator.is_alive()
     assert not terminal.loader._is_running
     assert not terminal.loader._animator.is_alive()
+    assert terminal.loader.exception is None
     assert window.ncols == 10
     assert window.nlines == 3
     stdscr.refresh.assert_called()
     stdscr.reset_mock()
 
-    # Raising and exception should clean up the loader properly
+    # Raising an exception should clean up the loader properly
     with pytest.raises(Exception):
         with terminal.loader(delay=0):
             assert terminal.loader._animator.is_alive()
             raise Exception()
     assert not terminal.loader._is_running
     assert not terminal.loader._animator.is_alive()
+    stdscr.refresh.assert_called()
+    stdscr.reset_mock()
+
+    # Raising a handled exception should get stored on the loaders
+    with terminal.loader(delay=0):
+        assert terminal.loader._animator.is_alive()
+        raise KeyboardInterrupt()
+    assert not terminal.loader._is_running
+    assert not terminal.loader._animator.is_alive()
+    assert isinstance(terminal.loader.exception, KeyboardInterrupt)
     stdscr.refresh.assert_called()
     stdscr.reset_mock()
 

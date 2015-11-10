@@ -3,8 +3,8 @@ import time
 import curses
 
 from .content import SubmissionContent
-from .page import Navigator, BasePage, BaseController
-from .helpers import open_browser, open_editor, oauth_required
+from .page import Page, Controller
+from .helpers import open_browser, open_editor, oauth_required, Navigator, Controller
 from .terminal import Color
 from .docs import COMMENT_FILE
 
@@ -13,7 +13,7 @@ class SubmissionController(BaseController):
     character_map = {}
 
 
-class SubmissionPage(BasePage):
+class SubmissionPage(Page):
 
     def __init__(self, stdscr, reddit, config, oauth, url=None,
                  submission=None):
@@ -107,14 +107,13 @@ class SubmissionPage(BasePage):
             self.show_notification('Aborted')
             return
 
-        with self.safe_call as s:
-            with self.loader(message='Posting', delay=0):
-                if data['type'] == 'Submission':
-                    data['object'].add_comment(comment_text)
-                else:
-                    data['object'].reply(comment_text)
-                time.sleep(2.0)
-            s.catch = False
+        with self.loader(message='Posting', delay=0):
+            if data['type'] == 'Submission':
+                data['object'].add_comment(comment_text)
+            else:
+                data['object'].reply(comment_text)
+            time.sleep(2.0)
+        if self.loader.exception is None:
             self.refresh_content()
 
     @SubmissionController.register('d')

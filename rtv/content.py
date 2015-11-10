@@ -7,7 +7,7 @@ from .exceptions import (SubmissionError, SubredditError, SubscriptionError,
                          AccountError)
 
 
-class BaseContent(object):
+class Content(object):
 
     def get(self, index, n_cols):
         raise NotImplementedError
@@ -164,7 +164,7 @@ class BaseContent(object):
         return data
 
 
-class SubmissionContent(BaseContent):
+class SubmissionContent(Content):
     """
     Grab a submission from PRAW and lazily store comments to an internal
     list for repeat access.
@@ -275,7 +275,7 @@ class SubmissionContent(BaseContent):
             raise ValueError('% type not recognized' % data['type'])
 
 
-class SubredditContent(BaseContent):
+class SubredditContent(Content):
     """
     Grab a subreddit from PRAW and lazily stores submissions to an internal
     list for repeat access.
@@ -388,7 +388,7 @@ class SubredditContent(BaseContent):
         return data
 
 
-class SubscriptionContent(BaseContent):
+class SubscriptionContent(Content):
 
     def __init__(self, subscriptions, loader):
 

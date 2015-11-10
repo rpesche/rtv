@@ -4,6 +4,8 @@ from __future__ import unicode_literals
 import os
 import time
 import curses
+import weakref
+import logging
 import threading
 import webbrowser
 import curses.ascii
@@ -11,10 +13,13 @@ from curses import textpad
 from contextlib import contextmanager
 
 import six
+import praw
+import requests
 from kitchen.text.display import textual_width_chop
 
-from .helpers import strip_textpad
 from .exceptions import EscapeInterrupt
+
+_logger = logging.getLogger(__name__)
 
 
 class Terminal(object):
@@ -27,7 +32,7 @@ class Terminal(object):
 
         self.stdscr = stdscr
         self.ascii = ascii
-        self.loader = LoadScreen(self.stdscr)
+        self.loader = LoadScreen(self)
 
         self._display = None
 
@@ -239,7 +244,7 @@ class Terminal(object):
             out = None
 
         curses.curs_set(0)
-        return strip_textpad(out)
+        return self.strip_textpad(out)
 
     def prompt_input(self, prompt, key=False):
         """
@@ -271,24 +276,69 @@ class Terminal(object):
             text = self.text_input(window)
         return text
 
+    @staticmethod
+    def strip_textpad(text):
+        """
+        Attempt to intelligently strip excess whitespace from the output of a
+        curses textpad.
+        """
+
+        if text is None:
+            return text
+
+        # Trivial case where the textbox is only one line long.
+        if '\n' not in text:
+            return text.rstrip()
+
+        # Allow one space at the end of the line. If there is more than one
+        # space, assume that a newline operation was intended by the user
+        stack, current_line = [], ''
+        for line in text.split('\n'):
+            if line.endswith('  '):
+                stack.append(current_line + line.rstrip())
+                current_line = ''
+            else:
+                current_line += line
+        stack.append(current_line)
+
+        # Prune empty lines at the bottom of the textbox.
+        for item in stack[::-1]:
+            if len(item) == 0:
+                stack.pop()
+            else:
+                break
+
+        out = '\n'.join(stack)
+        return out
+
 
 class LoadScreen(object):
     """
     Display a loading dialog while waiting for a blocking action to complete.
 
     This class spins off a separate thread to animate the loading screen in the
-    background.
+    background. The loading thread also takes control of stdscr.getch(). If
+    an exception occurs in the main thread while the loader is active, the
+    exception will be caught, attached to the loader object, and displayed as
+    a notification. The attached exception can be used to trigger context
+    sensitive actions. For example, if the connection hangs while opening a
+    submission, the user may press ctrl-c to raise a KeyboardInterrupt. In this
+    case we would *not* want to refresh the current page.
 
     Usage:
-        #>>> loader = LoadScreen(stdscr)
-        #>>> with loader(...):
-        #>>>     blocking_request(...)
+        >>> with self.terminal.loader(...) as loader:
+        >>>     # Perform a blocking request to load content
+        >>>     blocking_request(...)
+        >>>
+        >>> if loader.exception is None:
+        >>>     # Only run this if the load was successful
+        >>>     self.refresh_content()
     """
 
-    def __init__(self, stdscr):
+    def __init__(self, terminal):
 
-        self._stdscr = stdscr
-
+        self.exception = None
+        self._terminal = weakref.proxy(terminal)
         self._args = None
         self._animator = None
         self._is_running = None
@@ -306,6 +356,7 @@ class LoadScreen(object):
                 loading screen.
         """
 
+        self.exception = None
         self._args = (delay, interval, message, trail)
         return self
 
@@ -316,11 +367,39 @@ class LoadScreen(object):
 
         self._is_running = True
         self._animator.start()
+        return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type, e, exc_tb):
 
         self._is_running = False
         self._animator.join()
+        self._terminal.stdscr.refresh()
+
+        if isinstance(e, praw.errors.APIException):
+            message = ['Error: {}'.format(e.error_type), e.message]
+            self._terminal.show_notification(message)
+            self.exception = e
+            _logger.exception(e)
+            return True
+        elif isinstance(e, praw.errors.ClientException):
+            message = ['Error: Client Exception', e.message]
+            self._terminal.show_notification(message)
+            self.exception = e
+            _logger.exception(e)
+            return True
+        elif isinstance(e, requests.HTTPError):
+            self._terminal.show_notification('Unexpected Error')
+            self.exception = e
+            _logger.exception(e)
+            return True
+        elif isinstance(e, requests.ConnectionError):
+            self._terminal.show_notification('Unexpected Error')
+            self.exception = e
+            _logger.exception(e)
+            return True
+        elif isinstance(e, KeyboardInterrupt):
+            self.exception = e
+            return True
 
     def animate(self, delay, interval, message, trail):
 
@@ -331,22 +410,21 @@ class LoadScreen(object):
             time.sleep(0.01)
 
         message_len = len(message) + len(trail)
-        n_rows, n_cols = self._stdscr.getmaxyx()
+        n_rows, n_cols = self._terminal.stdscr.getmaxyx()
         s_row = (n_rows - 3) // 2
         s_col = (n_cols - message_len - 1) // 2
-        window = self._stdscr.derwin(3, message_len + 2, s_row, s_col)
+        window = self._terminal.stdscr.derwin(3, message_len + 2, s_row, s_col)
 
         while True:
             for i in range(len(trail) + 1):
                 if not self._is_running:
                     window.clear()
                     del window
-                    self._stdscr.refresh()
                     return
 
                 window.erase()
                 window.border()
-                window.addstr(1, 1, message + trail[:i])
+                self._terminal.add_line(window, message + trail[:i], 1, 1)
                 window.refresh()
                 time.sleep(interval)
 
@@ -442,7 +520,7 @@ def curses_session():
         yield stdscr
 
     finally:
-        if 'stdscr' in locals() and stdscr is not None:
+        if 'stdscr' not in locals():
             stdscr.keypad(0)
             curses.echo()
             curses.nocbreak()
