@@ -4,7 +4,7 @@ import curses
 
 from .content import SubmissionContent
 from .page import Page, Controller
-from .helpers import open_browser, open_editor, oauth_required, Navigator, Controller
+from .helpers import open_browser, open_editor, logged_in, Navigator, Controller
 from .terminal import Color
 from .docs import COMMENT_FILE
 
@@ -81,7 +81,7 @@ class SubmissionPage(Page):
             curses.flash()
 
     @SubmissionController.register('c')
-    @oauth_required
+    @logged_in
     def add_comment(self):
         """
         Add a top-level comment if the submission is selected, or reply to the

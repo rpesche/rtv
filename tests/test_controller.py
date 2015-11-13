@@ -21,25 +21,24 @@ def test_controller():
         character_map = {}
 
     @ControllerA.register('1')
-    def call_page(page):
+    def call_page(_):
         return 'a1'
 
     @ControllerA.register('2')
-    def call_page(page):
+    def call_page(_):
         return 'a2'
 
     @ControllerB.register('1')
-    def call_page(page):
+    def call_page(_):
         return 'b1'
 
     @ControllerC.register('2')
-    def call_page(page):
+    def call_page(_):
         return 'c2'
 
-    page = mock.MagicMock()
-    controller_a = ControllerA(page)
-    controller_b = ControllerB(page)
-    controller_c = ControllerC(page)
+    controller_a = ControllerA(None)
+    controller_b = ControllerB(None)
+    controller_c = ControllerC(None)
 
     assert controller_a.trigger('1') == 'a1'
     assert controller_a.trigger('2') == 'a2'

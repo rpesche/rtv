@@ -6,7 +6,7 @@ import logging
 from kitchen.text.display import textual_width
 
 from .docs import COMMENT_EDIT_FILE, SUBMISSION_FILE, HELP
-from .helpers import open_editor, oauth_required, Controller
+from .helpers import open_editor, logged_in, Controller
 from .terminal import Color, Terminal
 
 _logger = logging.getLogger(__name__)
@@ -103,7 +103,7 @@ class Page(Terminal):
         self.clear_input_queue()
 
     @BaseController.register('a')
-    @oauth_required
+    @logged_in
     def upvote(self):
         data = self.content.get(self.nav.absolute_index)
         if 'likes' not in data:
@@ -116,7 +116,7 @@ class Page(Terminal):
             data['likes'] = True
 
     @BaseController.register('z')
-    @oauth_required
+    @logged_in
     def downvote(self):
         data = self.content.get(self.nav.absolute_index)
         if 'likes' not in data:
@@ -146,7 +146,7 @@ class Page(Terminal):
             self.oauth.authorize()
 
     @BaseController.register('d')
-    @oauth_required
+    @logged_in
     def delete(self):
         """
         Delete a submission or comment.
@@ -170,7 +170,7 @@ class Page(Terminal):
             self.refresh_content()
 
     @BaseController.register('e')
-    @oauth_required
+    @logged_in
     def edit(self):
         """
         Edit a submission or comment.
@@ -204,7 +204,7 @@ class Page(Terminal):
             self.refresh_content()
 
     @BaseController.register('i')
-    @oauth_required
+    @logged_in
     def get_inbox(self):
         """
         Checks the inbox for unread messages and displays a notification.

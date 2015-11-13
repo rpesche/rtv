@@ -1,8 +1,10 @@
 import re
+from datetime import datetime
+
 import praw
 import requests
+from kitchen.text.display import wrap
 
-from .helpers import humanize_timestamp, wrap_text, strip_subreddit_url
 from .exceptions import (SubmissionError, SubredditError, SubscriptionError,
                          AccountError)
 
@@ -84,7 +86,7 @@ class Content(object):
 
             data['type'] = 'Comment'
             data['body'] = comment.body
-            data['created'] = humanize_timestamp(comment.created_utc)
+            data['created'] = self.humanize_timestamp(comment.created_utc)
             data['score'] = '{} pts'.format(comment.score)
             data['author'] = name
             data['is_author'] = (name == sub_name)
@@ -119,7 +121,7 @@ class Content(object):
         data['type'] = 'Submission'
         data['title'] = sub.title
         data['text'] = sub.selftext
-        data['created'] = humanize_timestamp(sub.created_utc)
+        data['created'] = self.humanize_timestamp(sub.created_utc)
         data['comments'] = '{} comments'.format(sub.num_comments)
         data['score'] = '{} pts'.format(sub.score)
         data['author'] = name
@@ -141,7 +143,9 @@ class Content(object):
             data['url'] = 'self.{}'.format(data['subreddit'])
         elif reddit_link.match(url_full):
             data['url_type'] = 'x-post'
-            data['url'] = 'self.{}'.format(strip_subreddit_url(url_full)[3:])
+            # Strip the subreddit name from the permalink to avoid having
+            # submission.subreddit.url make a separate API call
+            data['url'] = 'self.{}'.format(url_full.split('/')[4][3:])
         else:
             data['url_type'] = 'external'
             data['url'] = url_full
@@ -160,8 +164,48 @@ class Content(object):
         data['type'] = 'Subscription'
         data['name'] = "/r/" + subscription.display_name
         data['title'] = subscription.title
-
         return data
+
+    @staticmethod
+    def humanize_timestamp(utc_timestamp, verbose=False):
+        """
+        Convert a utc timestamp into a human readable relative-time.
+        """
+
+        timedelta = datetime.utcnow() - datetime.utcfromtimestamp(utc_timestamp)
+
+        seconds = int(timedelta.total_seconds())
+        if seconds < 60:
+            return 'moments ago' if verbose else '0min'
+        minutes = seconds // 60
+        if minutes < 60:
+            return '%d minutes ago' % minutes if verbose else '%dmin' % minutes
+        hours = minutes // 60
+        if hours < 24:
+            return '%d hours ago' % hours if verbose else '%dhr' % hours
+        days = hours // 24
+        if days < 30:
+            return '%d days ago' % days if verbose else '%dday' % days
+        months = days // 30.4
+        if months < 12:
+            return '%d months ago' % months if verbose else '%dmonth' % months
+        years = months // 12
+        return '%d years ago' % years if verbose else '%dyr' % years
+
+    @staticmethod
+    def wrap_text(text, width):
+        """
+        Wrap text paragraphs to the given character width while preserving
+        newlines.
+        """
+        out = []
+        for paragraph in text.splitlines():
+            # Wrap returns an empty list when paragraph is a newline. In order
+            # to preserve newlines we substitute a list containing an empty
+            # string.
+            lines = wrap(paragraph, width=width) or ['']
+            out.extend(lines)
+        return out
 
 
 class SubmissionContent(Content):

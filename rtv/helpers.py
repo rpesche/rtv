@@ -8,18 +8,37 @@ import codecs
 import inspect
 import webbrowser
 import subprocess
-from datetime import datetime
 from tempfile import NamedTemporaryFile
 
 import six
-from kitchen.text.display import wrap
 
 from .exceptions import ProgramError
 
 
+def logged_in(f):
+    """
+    Decorator for Page methods that require the user to be authenticated.
+    """
+    @wraps(f)
+    def wrapped_method(self, *args, **kwargs):
+        if not self.reddit.is_oauth_session():
+            self.show_notification('Not logged in')
+            return
+        return f(self, *args, **kwargs)
+    return wrapped_method
+
+
 class Navigator(object):
     """
-    Handles math behind cursor movement and screen paging.
+    Handles the math behind cursor movement and screen paging.
+
+    This class determines how cursor movements effect the currently displayed
+    page. For example, if scrolling down the page, items are drawn from the
+    bottom up. This ensures that the item at the very bottom of the screen
+    (the one selected by cursor) will be fully drawn and not cut off. Likewise,
+    when scrolling up the page, items are drawn from the top down. If the
+    cursor is moved around without hitting the top or bottom of the screen, the
+    current mode is preserved.
     """
 
     def __init__(
@@ -28,13 +47,27 @@ class Navigator(object):
             page_index=0,
             cursor_index=0,
             inverted=False):
+        """
+        Params:
+            valid_page_callback (func): This function, usually `Content.get`,
+                takes a page index and raises an IndexError if that index falls
+                out of bounds. This is used to determine the upper and lower
+                bounds of the page, i.e. when to stop scrolling.
+            page_index (int): Initial page index.
+            cursor_index (int): Initial cursor index, relative to the page.
+            inverted (bool): Whether the page scrolling is reversed of not.
+                normal - The page is drawn from the top of the screen,
+                    starting with the page index, down to the bottom of
+                    the screen.
+                inverted - The page is drawn from the bottom of the screen,
+                    starting with the page index, up to the top of the
+                    screen.
+        """
 
         self.page_index = page_index
         self.cursor_index = cursor_index
         self.inverted = inverted
         self._page_cb = valid_page_cb
-        self._header_window = None
-        self._content_window = None
 
     @property
     def step(self):
@@ -46,13 +79,33 @@ class Navigator(object):
 
     @property
     def absolute_index(self):
+        """
+        Return the index of the currently selected item.
+        """
+
         return self.page_index + (self.step * self.cursor_index)
 
     def move(self, direction, n_windows):
-        "Move the cursor down (positive direction) or up (negative direction)"
+        """
+        Move the cursor up or down by the given increment.
+
+        Params:
+            direction (int): `1` will move the cursor down one item and `-1`
+                will move the cursor up one item.
+            n_windows (int): The number of items that are currently being drawn
+                on the screen.
+
+        Returns:
+            valid (bool): Indicates whether or not the attempted cursor move is
+                allowed. E.g. When the cursor is on the last comment,
+                attempting to scroll down any further would not be valid.
+            redraw (bool): Indicates whether or not the screen needs to be
+                redrawn.
+        """
+
+        assert direction in (-1, 1)
 
         valid, redraw = True, False
-
         forward = ((direction * self.step) > 0)
 
         if forward:
@@ -92,8 +145,18 @@ class Navigator(object):
 
     def move_page(self, direction, n_windows):
         """
-        Move page down (positive direction) or up (negative direction).
+        Move the page down (positive direction) or up (negative direction).
+
+        Paging down:
+            The post on the bottom of the page becomes the post at the top of
+            the page and the cursor is moved to the top.
+        Paging up:
+            The post at the top of the page becomes the post at the bottom of
+            the page and the cursor is moved to the bottom.
         """
+
+        assert direction in (-1, 1)
+        assert n_windows >= 0
 
         # top of subreddit/submission page or only one
         # submission/reply on the screen: act as normal move
@@ -138,14 +201,19 @@ class Navigator(object):
         return valid, redraw
 
     def flip(self, n_windows):
-        "Flip the orientation of the page"
+        """
+        Flip the orientation of the page.
+        """
 
+        assert n_windows >= 0
         self.page_index += (self.step * n_windows)
         self.cursor_index = n_windows
         self.inverted = not self.inverted
 
     def _is_valid(self, page_index):
-        "Check if a page index will cause entries to fall outside valid range"
+        """
+        Check if a page index will cause entries to fall outside valid range.
+        """
 
         try:
             self._page_cb(page_index)
@@ -276,54 +344,3 @@ def open_browser(url, display=True):
         curses.endwin()
         webbrowser.open_new_tab(url)
         curses.doupdate()
-
-
-def wrap_text(text, width):
-    """
-    Wrap text paragraphs to the given character width while preserving
-    newlines.
-    """
-    out = []
-    for paragraph in text.splitlines():
-        # Wrap returns an empty list when paragraph is a newline. In order to
-        # preserve newlines we substitute a list containing an empty string.
-        lines = wrap(paragraph, width=width) or ['']
-        out.extend(lines)
-    return out
-
-
-def strip_subreddit_url(permalink):
-    """
-    Strip a subreddit name from the subreddit's permalink.
-
-    This is used to avoid submission.subreddit.url making a separate API call.
-    """
-
-    subreddit = permalink.split('/')[4]
-    return '/r/{}'.format(subreddit)
-
-
-def humanize_timestamp(utc_timestamp, verbose=False):
-    """
-    Convert a utc timestamp into a human readable relative-time.
-    """
-
-    timedelta = datetime.utcnow() - datetime.utcfromtimestamp(utc_timestamp)
-
-    seconds = int(timedelta.total_seconds())
-    if seconds < 60:
-        return 'moments ago' if verbose else '0min'
-    minutes = seconds // 60
-    if minutes < 60:
-        return ('%d minutes ago' % minutes) if verbose else ('%dmin' % minutes)
-    hours = minutes // 60
-    if hours < 24:
-        return ('%d hours ago' % hours) if verbose else ('%dhr' % hours)
-    days = hours // 24
-    if days < 30:
-        return ('%d days ago' % days) if verbose else ('%dday' % days)
-    months = days // 30.4
-    if months < 12:
-        return ('%d months ago' % months) if verbose else ('%dmonth' % months)
-    years = months // 12
-    return ('%d years ago' % years) if verbose else ('%dyr' % years)

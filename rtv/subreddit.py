@@ -8,7 +8,7 @@ from .page import Navigator, Page, BaseController
 from .submission import SubmissionPage
 from .subscription import SubscriptionPage
 from .content import SubredditContent
-from .helpers import open_browser, open_editor, oauth_required
+from .helpers import open_browser, open_editor, logged_in
 from .terminal import Color, LoadScreen
 from .docs import SUBMISSION_FILE
 
@@ -128,7 +128,7 @@ class SubredditPage(Page):
         self.config.history.add(url)
 
     @SubredditController.register('c')
-    @oauth_required
+    @logged_in
     def post_submission(self):
         "Post a new submission to the given subreddit"
 
@@ -164,7 +164,7 @@ class SubredditPage(Page):
             self.refresh_content()
 
     @SubredditController.register('s')
-    @oauth_required
+    @logged_in
     def open_subscriptions(self):
         "Open user subscriptions page"
 
