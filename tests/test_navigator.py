@@ -187,3 +187,22 @@ def test_navigator_move_page():
     assert not nav.inverted
     assert valid
     assert redraw
+
+
+def test_navigator_flip():
+
+    def valid_page_cb(index):
+        if index < 0 or index > 10:
+            raise IndexError()
+
+    nav = Navigator(valid_page_cb)
+
+    nav.flip(5)
+    assert nav.page_index == 5
+    assert nav.cursor_index == 5
+    assert nav.inverted
+
+    nav.flip(3)
+    assert nav.page_index == 2
+    assert nav.cursor_index == 3
+    assert not nav.inverted

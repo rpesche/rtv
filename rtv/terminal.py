@@ -520,7 +520,7 @@ def curses_session():
         yield stdscr
 
     finally:
-        if 'stdscr' not in locals():
+        if 'stdscr' in locals():
             stdscr.keypad(0)
             curses.echo()
             curses.nocbreak()

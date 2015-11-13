@@ -53,7 +53,8 @@ def test_authorize(oauth, reddit, stdscr):
         io.start.side_effect = lambda *_: oauth.params.update(**params)
 
         oauth.authorize()
-        stdscr.subwin.addstr.assert_any_call(1, 1, 'Redirecting to reddit')
+        message = 'Redirecting to reddit'.encode('utf-8')
+        stdscr.subwin.addstr.assert_any_call(1, 1, message)
         assert not open_browser.called
         oauth.reddit.get_access_information.assert_called_with(
             reddit, params['code'])
@@ -76,7 +77,8 @@ def test_authorize(oauth, reddit, stdscr):
         oauth.config.refresh_token = None
         uuid.return_value = 'invalidcode'
         oauth.authorize()
-        stdscr.subwin.addstr.assert_any_call(1, 1, 'Redirecting to reddit')
+        message = 'Redirecting to reddit'.encode('utf-8')
+        stdscr.subwin.addstr.assert_any_call(1, 1, message)
         error_message = 'UUID mismatch'.encode('utf-8')
         stdscr.subwin.addstr.assert_any_call(1, 1, error_message)
 
