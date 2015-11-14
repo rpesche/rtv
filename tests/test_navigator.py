@@ -3,7 +3,7 @@ from __future__ import unicode_literals
 
 import pytest
 
-from rtv.helpers import Navigator
+from rtv.objects import Navigator
 
 try:
     from unittest import mock

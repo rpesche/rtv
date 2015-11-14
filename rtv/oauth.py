@@ -9,8 +9,6 @@ from praw.errors import OAuthAppRequired, OAuthException
 from tornado import gen, ioloop, web, httpserver
 from concurrent.futures import ThreadPoolExecutor
 
-from .helpers import open_browser
-
 
 class OAuthHandler(web.RequestHandler):
     """
@@ -96,7 +94,7 @@ class OAuthHelper(object):
             # Stop the iloop when the user hits the auth callback, at which
             # point we continue and check the callback params.
             with self.term.loader(message='Waiting for authorization'):
-                open_browser(authorize_url, self.term.display)
+                self.term.open_browser(authorize_url)
                 io.start()
         else:
             # Open the terminal webbrowser in a background thread and wait
@@ -106,7 +104,7 @@ class OAuthHelper(object):
             with self.term.loader(delay=0, message='Redirecting to reddit'):
                 # This load message exists to provide user feedback
                 time.sleep(1)
-            io.add_callback(self._open_browser_in_background, authorize_url)
+            io.add_callback(self._async_open_browser, authorize_url)
             io.start()
 
         if not self.params['code']:
@@ -141,7 +139,7 @@ class OAuthHelper(object):
         self.config.delete_refresh_token()
 
     @gen.coroutine
-    def _open_browser_in_background(self, url):
+    def _async_open_browser(self, url):
         with ThreadPoolExecutor(max_workers=1) as executor:
-            yield executor.submit(open_browser, url, self.term.display)
+            yield executor.submit(self.term.open_browser, url)
         ioloop.IOLoop.current().stop()

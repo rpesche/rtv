@@ -52,12 +52,11 @@ Submission Mode
   `SPACE`             : Fold the selected comment, or load additional comments
 """
 
-COMMENT_FILE = """
+COMMENT_FILE = """{content}
 # Please enter a comment. Lines starting with '#' will be ignored,
 # and an empty message aborts the comment.
 #
 # Replying to {author}'s {type}
-{content}
 """
 
 COMMENT_EDIT_FILE = """{content}

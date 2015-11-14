@@ -1,14 +1,15 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
-import time
+import os
 import curses
+import codecs
 
 import six
 import pytest
 
-from rtv.docs import HELP
-from rtv.terminal import LoadScreen, Color, curses_session
+from rtv.docs import HELP, COMMENT_EDIT_FILE
+from rtv.objects import Color
 
 try:
     from unittest import mock
@@ -44,7 +45,37 @@ def test_terminal_properties(terminal, config):
     assert terminal.get_arrow(True) is not None
     assert terminal.get_arrow(False) is not None
     assert terminal.ascii == config['ascii']
-    assert isinstance(terminal.loader, LoadScreen)
+    assert terminal.loader is not None
+
+    assert terminal.MIN_HEIGHT is not None
+    assert terminal.MIN_WIDTH is not None
+
+
+def test_terminal_functions(terminal):
+
+    terminal.flash()
+    assert curses.flash.called
+
+    terminal.getch()
+    assert terminal.stdscr.getch.called
+
+    terminal.nodelay(1)
+    terminal.stdscr.nodelay.assert_called_with(1)
+
+    curses.endwin.reset_mock()
+    curses.doupdate.reset_mock()
+    with terminal.suspend():
+        pass
+    assert curses.endwin.called
+    assert curses.doupdate.called
+
+    curses.endwin.reset_mock()
+    curses.doupdate.reset_mock()
+    with pytest.raises(RuntimeError):
+        with terminal.suspend():
+            raise RuntimeError()
+    assert curses.endwin.called
+    assert curses.doupdate.called
 
 
 def test_terminal_clean_ascii(terminal):
@@ -174,7 +205,8 @@ def test_prompt_input(terminal, stdscr, ascii):
     window.getch.side_effect = ['h', 'e', 'l', 'l', 'o', terminal.RETURN]
     assert isinstance(terminal.prompt_input('hi'), six.text_type)
 
-    stdscr.addstr.assert_called_with(39, 0, 'hi'.encode('ascii'), 2097152)
+    attr = Color.CYAN | curses.A_BOLD
+    stdscr.addstr.assert_called_with(39, 0, 'hi'.encode('ascii'), attr)
     assert window.nlines == 1
     assert window.ncols == 78
 
@@ -188,91 +220,41 @@ def test_prompt_input(terminal, stdscr, ascii):
     assert terminal.prompt_input('hi', key=True) is None
 
 
-@pytest.mark.parametrize('ascii', [True, False])
-def test_load_screen(terminal, stdscr, ascii):
+def test_open_editor(terminal):
 
-    terminal.ascii = ascii
-    window = stdscr.derwin()
+    comment = COMMENT_EDIT_FILE.format(content='#| This is a comment! ❤')
+    data = {'filename': None}
 
-    # Ensure the thread is properly started/stopped
-    with terminal.loader(delay=0, message=u'Hello', trail=u'...'):
-        assert terminal.loader._animator.is_alive()
-    assert not terminal.loader._is_running
-    assert not terminal.loader._animator.is_alive()
-    assert terminal.loader.exception is None
-    assert window.ncols == 10
-    assert window.nlines == 3
-    stdscr.refresh.assert_called()
-    stdscr.reset_mock()
+    def side_effect(args):
+        data['filename'] = args[1]
+        with codecs.open(data['filename'], 'r+', 'utf-8') as fp:
+            assert fp.read() == comment
+            fp.write('This is an amended comment! ❤')
+        return mock.Mock()
 
-    # Raising an exception should clean up the loader properly
-    with pytest.raises(Exception):
-        with terminal.loader(delay=0):
-            assert terminal.loader._animator.is_alive()
-            raise Exception()
-    assert not terminal.loader._is_running
-    assert not terminal.loader._animator.is_alive()
-    stdscr.refresh.assert_called()
-    stdscr.reset_mock()
+    with mock.patch('subprocess.Popen', autospec=True) as Popen:
+        Popen.side_effect = side_effect
 
-    # Raising a handled exception should get stored on the loaders
-    with terminal.loader(delay=0):
-        assert terminal.loader._animator.is_alive()
-        raise KeyboardInterrupt()
-    assert not terminal.loader._is_running
-    assert not terminal.loader._animator.is_alive()
-    assert isinstance(terminal.loader.exception, KeyboardInterrupt)
-    stdscr.refresh.assert_called()
-    stdscr.reset_mock()
+        reply_text = terminal.open_editor(comment)
+        assert reply_text == 'This is an amended comment! ❤'
+        assert not os.path.isfile(data['filename'])
+        assert curses.endwin.called
+        assert curses.doupdate.called
 
-    # If we don't reach the initial delay nothing should be drawn
-    with terminal.loader(delay=0.1):
-        time.sleep(0.05)
-    window.addstr.assert_not_called()
-    window.reset_mock()
+def test_open_browser(terminal):
 
+    url = 'http://www.test.com'
 
-def test_color(stdscr):
-
-    colors = ['RED', 'GREEN', 'YELLOW', 'BLUE', 'MAGENTA', 'CYAN', 'WHITE']
-
-    # Check that all colors start with the default value
-    for color in colors:
-        assert getattr(Color, color) == curses.A_NORMAL
-
-    Color.init()
-    assert curses.use_default_colors.called
-
-    # Check that all colors are populated
-    for color in colors:
-        assert getattr(Color, color) == 23
-
-
-def test_curses_session(stdscr):
-
-    # Normal setup and cleanup
-    with curses_session():
-        pass
-    assert curses.initscr.called
-    assert curses.endwin.called
-    curses.initscr.reset_mock()
-    curses.endwin.reset_mock()
-
-    # Ensure cleanup runs if an error occurs
-    with pytest.raises(KeyboardInterrupt):
-        with curses_session():
-            raise KeyboardInterrupt()
-    assert curses.initscr.called
-    assert curses.endwin.called
-    curses.initscr.reset_mock()
-    curses.endwin.reset_mock()
-
-    # But cleanup shouldn't run if stdscr was never instantiated
-    curses.initscr.side_effect = KeyboardInterrupt()
-    with pytest.raises(KeyboardInterrupt):
-        with curses_session():
-            pass
-    assert curses.initscr.called
+    terminal._display = True
+    with mock.patch('subprocess.check_call', autospec=True) as check_call:
+        terminal.open_browser(url)
+    assert check_call.called
     assert not curses.endwin.called
-    curses.initscr.reset_mock()
-    curses.endwin.reset_mock()
+    assert not curses.doupdate.called
+
+    terminal._display = False
+    with mock.patch('webbrowser.open_new_tab', autospec=True) as open_new_tab:
+        terminal.open_browser(url)
+    open_new_tab.assert_called_with(url)
+    assert curses.endwin.called
+    assert curses.doupdate.called

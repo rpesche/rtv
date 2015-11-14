@@ -8,8 +8,8 @@ from .page import Navigator, Page, BaseController
 from .submission import SubmissionPage
 from .subscription import SubscriptionPage
 from .content import SubredditContent
-from .helpers import open_browser, open_editor, logged_in
-from .terminal import Color, LoadScreen
+from .helpers import logged_in
+from .terminal import Color
 from .docs import SUBMISSION_FILE
 
 
@@ -141,8 +141,8 @@ class SubredditPage(Page):
             return
 
         submission_info = SUBMISSION_FILE.format(name=subreddit, content='')
-        submission_text = open_editor(submission_info)
 
+        submission_text = self.term.open_editor(submission_info)
         if not submission_text:
             self.show_notification('Aborted')
             return

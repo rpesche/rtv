@@ -39,7 +39,7 @@ def test_authorize(oauth, reddit, stdscr):
     # Because we use `from .helpers import open_browser` we have to patch the
     # function in the destination oauth module and not the helpers module
     with mock.patch('uuid.UUID.hex', new_callable=mock.PropertyMock) as uuid, \
-            mock.patch('rtv.oauth.open_browser') as open_browser,             \
+            mock.patch('rtv.terminal.Terminal.open_browser') as open_browser, \
             mock.patch('rtv.oauth.ioloop') as ioloop,                         \
             mock.patch('rtv.oauth.httpserver'),                               \
             mock.patch.object(oauth.reddit, 'user'),                          \

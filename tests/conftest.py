@@ -71,6 +71,7 @@ def config():
 def stdscr():
     with patch('curses.initscr'),               \
             patch('curses.endwin'),             \
+            patch('curses.doupdate'),           \
             patch('curses.noecho'),             \
             patch('curses.echo'),               \
             patch('curses.nocbreak'),           \
@@ -79,7 +80,8 @@ def stdscr():
             patch('curses.curs_set'),           \
             patch('curses.use_default_colors'), \
             patch('curses.color_pair'),         \
-            patch('curses.init_pair'):
+            patch('curses.init_pair'),          \
+            patch('curses.flash'):
         out = MockStdscr(nlines=40, ncols=80, x=0, y=0)
         curses.initscr.return_value = out
         curses.color_pair.return_value = 23

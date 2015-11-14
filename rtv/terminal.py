@@ -2,27 +2,27 @@
 from __future__ import unicode_literals
 
 import os
-import time
+import sys
+import codecs
 import curses
-import weakref
-import logging
-import threading
 import webbrowser
+import subprocess
 import curses.ascii
 from curses import textpad
 from contextlib import contextmanager
+from tempfile import NamedTemporaryFile
 
 import six
-import praw
-import requests
 from kitchen.text.display import textual_width_chop
 
-from .exceptions import EscapeInterrupt
-
-_logger = logging.getLogger(__name__)
+from .objects import LoadScreen, Color
+from .exceptions import EscapeInterrupt, ProgramError
 
 
 class Terminal(object):
+
+    MIN_HEIGHT = 10
+    MIN_WIDTH = 20
 
     # ASCII code
     ESCAPE = 27
@@ -82,6 +82,25 @@ class Terminal(object):
                     display = False
             self._display = display
         return self._display
+
+    @staticmethod
+    def flash():
+        return curses.flash()
+
+    @staticmethod
+    @contextmanager
+    def suspend():
+        try:
+            curses.endwin()
+            yield
+        finally:
+            curses.doupdate()
+
+    def getch(self):
+        return self.stdscr.getch()
+
+    def nodelay(self, val):
+        return self.stdscr.nodelay(val)
 
     def get_arrow(self, likes):
         """
@@ -202,6 +221,69 @@ class Terminal(object):
 
         return ch
 
+    def open_browser(self, url):
+        """
+        Open the given url using the default webbrowser. The preferred browser
+        can specified with the $BROWSER environment variable. If not specified,
+        python webbrowser will try to determine the default to use based on
+        your system.
+
+        For browsers requiring an X display, we call
+        webbrowser.open_new_tab(url) and redirect stdout/stderr to devnull.
+        This is a workaround to stop firefox from spewing warning messages to
+        the console. See http://bugs.python.org/issue22277 for a better
+        description of the problem.
+
+        For console browsers (e.g. w3m), RTV will suspend and display the
+        browser window within the same terminal. This mode is triggered either
+        when
+
+        1. $BROWSER is set to a known console browser, or
+        2. $DISPLAY is undefined, indicating that the terminal is running
+           headless
+
+        There may be other cases where console browsers are opened (xdg-open?)
+        but are not detected here.
+        """
+
+        if self.display:
+            command = "import webbrowser; webbrowser.open_new_tab('%s')" % url
+            args = [sys.executable, '-c', command]
+            with open(os.devnull, 'ab+', 0) as null:
+                subprocess.check_call(args, stdout=null, stderr=null)
+        else:
+            with self.suspend():
+                webbrowser.open_new_tab(url)
+
+    def open_editor(self, data=''):
+        """
+        Open a temporary file using the system's default editor.
+
+        The data string will be written to the file before opening. This
+        function will block until the editor has closed. At that point the file
+        will be read and and lines starting with '#' will be stripped.
+        """
+
+        with NamedTemporaryFile(prefix='rtv-', suffix='.txt', mode='wb') as fp:
+            fp.write(codecs.encode(data, 'utf-8'))
+            fp.flush()
+            editor = os.getenv('RTV_EDITOR') or os.getenv('EDITOR') or 'nano'
+
+            try:
+                with self.suspend():
+                    subprocess.Popen([editor, fp.name]).wait()
+            except OSError:
+                raise ProgramError('Could not open file with %s' % editor)
+
+            # Open a second file object to read. This appears to be necessary
+            # in order to read the changes made by some editors (gedit). w+
+            # mode does not work!
+            with codecs.open(fp.name, 'r', 'utf-8') as fp2:
+                text = ''.join(line for line in fp2 if not line.startswith('#'))
+                text = text.rstrip()
+
+        return text
+
     def text_input(self, window, allow_resize=False):
         """
         Transform a window into a text box that will accept user input and loop
@@ -310,218 +392,3 @@ class Terminal(object):
 
         out = '\n'.join(stack)
         return out
-
-
-class LoadScreen(object):
-    """
-    Display a loading dialog while waiting for a blocking action to complete.
-
-    This class spins off a separate thread to animate the loading screen in the
-    background. The loading thread also takes control of stdscr.getch(). If
-    an exception occurs in the main thread while the loader is active, the
-    exception will be caught, attached to the loader object, and displayed as
-    a notification. The attached exception can be used to trigger context
-    sensitive actions. For example, if the connection hangs while opening a
-    submission, the user may press ctrl-c to raise a KeyboardInterrupt. In this
-    case we would *not* want to refresh the current page.
-
-    Usage:
-        >>> with self.terminal.loader(...) as loader:
-        >>>     # Perform a blocking request to load content
-        >>>     blocking_request(...)
-        >>>
-        >>> if loader.exception is None:
-        >>>     # Only run this if the load was successful
-        >>>     self.refresh_content()
-    """
-
-    def __init__(self, terminal):
-
-        self.exception = None
-        self._terminal = weakref.proxy(terminal)
-        self._args = None
-        self._animator = None
-        self._is_running = None
-
-    def __call__(self, delay=0.5, interval=0.4, message='Downloading',
-                 trail='...'):
-        """
-        Params:
-            delay (float): Length of time that the loader will wait before
-                printing on the screen. Used to prevent flicker on pages that
-                load very fast.
-            interval (float): Length of time between each animation frame.
-            message (str): Message to display
-            trail (str): Trail of characters that will be animated by the
-                loading screen.
-        """
-
-        self.exception = None
-        self._args = (delay, interval, message, trail)
-        return self
-
-    def __enter__(self):
-
-        self._animator = threading.Thread(target=self.animate, args=self._args)
-        self._animator.daemon = True
-
-        self._is_running = True
-        self._animator.start()
-        return self
-
-    def __exit__(self, exc_type, e, exc_tb):
-
-        self._is_running = False
-        self._animator.join()
-        self._terminal.stdscr.refresh()
-
-        if isinstance(e, praw.errors.APIException):
-            message = ['Error: {}'.format(e.error_type), e.message]
-            self._terminal.show_notification(message)
-            self.exception = e
-            _logger.exception(e)
-            return True
-        elif isinstance(e, praw.errors.ClientException):
-            message = ['Error: Client Exception', e.message]
-            self._terminal.show_notification(message)
-            self.exception = e
-            _logger.exception(e)
-            return True
-        elif isinstance(e, requests.HTTPError):
-            self._terminal.show_notification('Unexpected Error')
-            self.exception = e
-            _logger.exception(e)
-            return True
-        elif isinstance(e, requests.ConnectionError):
-            self._terminal.show_notification('Unexpected Error')
-            self.exception = e
-            _logger.exception(e)
-            return True
-        elif isinstance(e, KeyboardInterrupt):
-            self.exception = e
-            return True
-
-    def animate(self, delay, interval, message, trail):
-
-        start = time.time()
-        while (time.time() - start) < delay:
-            if not self._is_running:
-                return
-            time.sleep(0.01)
-
-        message_len = len(message) + len(trail)
-        n_rows, n_cols = self._terminal.stdscr.getmaxyx()
-        s_row = (n_rows - 3) // 2
-        s_col = (n_cols - message_len - 1) // 2
-        window = self._terminal.stdscr.derwin(3, message_len + 2, s_row, s_col)
-
-        while True:
-            for i in range(len(trail) + 1):
-                if not self._is_running:
-                    window.clear()
-                    del window
-                    return
-
-                window.erase()
-                window.border()
-                self._terminal.add_line(window, message + trail[:i], 1, 1)
-                window.refresh()
-                time.sleep(interval)
-
-
-class Color(object):
-
-    """
-    Color attributes for curses.
-    """
-
-    RED = curses.A_NORMAL
-    GREEN = curses.A_NORMAL
-    YELLOW = curses.A_NORMAL
-    BLUE = curses.A_NORMAL
-    MAGENTA = curses.A_NORMAL
-    CYAN = curses.A_NORMAL
-    WHITE = curses.A_NORMAL
-
-    _colors = {
-        'RED': (curses.COLOR_RED, -1),
-        'GREEN': (curses.COLOR_GREEN, -1),
-        'YELLOW': (curses.COLOR_YELLOW, -1),
-        'BLUE': (curses.COLOR_BLUE, -1),
-        'MAGENTA': (curses.COLOR_MAGENTA, -1),
-        'CYAN': (curses.COLOR_CYAN, -1),
-        'WHITE': (curses.COLOR_WHITE, -1),
-    }
-
-    @classmethod
-    def init(cls):
-        """
-        Initialize color pairs inside of curses using the default background.
-
-        This should be called once during the curses initial setup. Afterwards,
-        curses color pairs can be accessed directly through class attributes.
-        """
-
-        # Assign the terminal's default (background) color to code -1
-        curses.use_default_colors()
-
-        for index, (attr, code) in enumerate(cls._colors.items(), start=1):
-            curses.init_pair(index, code[0], code[1])
-            setattr(cls, attr, curses.color_pair(index))
-
-    @classmethod
-    def get_level(cls, level):
-
-        levels = [cls.MAGENTA, cls.CYAN, cls.GREEN, cls.YELLOW]
-        return levels[level % len(levels)]
-
-
-@contextmanager
-def curses_session():
-    """
-    Setup terminal and initialize curses. Most of this copied from
-    curses.wrapper in order to convert the wrapper into a context manager.
-    """
-
-    try:
-        # Curses must wait for some time after the Escape key is pressed to
-        # check if it is the beginning of an escape sequence indicating a
-        # special key. The default wait time is 1 second, which means that
-        # http://stackoverflow.com/questions/27372068
-        os.environ['ESCDELAY'] = '25'
-
-        # Initialize curses
-        stdscr = curses.initscr()
-
-        # Turn off echoing of keys, and enter cbreak mode, where no buffering
-        # is performed on keyboard input
-        curses.noecho()
-        curses.cbreak()
-
-        # In keypad mode, escape sequences for special keys (like the cursor
-        # keys) will be interpreted and a special value like curses.KEY_LEFT
-        # will be returned
-        stdscr.keypad(1)
-
-        # Start color, too.  Harmless if the terminal doesn't have color; user
-        # can test with has_color() later on.  The try/catch works around a
-        # minor bit of over-conscientiousness in the curses module -- the error
-        # return from C start_color() is ignorable.
-        try:
-            curses.start_color()
-        except:
-            pass
-
-        # Hide the blinking cursor
-        curses.curs_set(0)
-
-        Color.init()
-
-        yield stdscr
-
-    finally:
-        if 'stdscr' in locals():
-            stdscr.keypad(0)
-            curses.echo()
-            curses.nocbreak()
-            curses.endwin()

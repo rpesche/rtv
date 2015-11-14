@@ -1,36 +1,43 @@
-import curses
 import time
 import sys
-import logging
+from functools import wraps
 
 from kitchen.text.display import textual_width
 
 from .docs import COMMENT_EDIT_FILE, SUBMISSION_FILE, HELP
-from .helpers import open_editor, logged_in, Controller
-from .terminal import Color, Terminal
+from .helpers import Controller
+from .terminal import Color
 
-_logger = logging.getLogger(__name__)
+
+def logged_in(f):
+    """
+    Decorator for Page methods that require the user to be authenticated.
+    """
+    @wraps(f)
+    def wrapped_method(self, *args, **kwargs):
+        if not self.reddit.is_oauth_session():
+            self.term.show_notification('Not logged in')
+            return
+        return f(self, *args, **kwargs)
+    return wrapped_method
 
 
 class BaseController(Controller):
     character_map = {}
 
 
-class Page(Terminal):
+class Page(object):
 
-    MIN_HEIGHT = 10
-    MIN_WIDTH = 20
-
-    def __init__(self, stdscr, reddit, config, oauth):
-
-        super(Page, self).__init__(stdscr, config)
+    def __init__(self, reddit, term, config, oauth):
 
         self.reddit = reddit
+        self.term = term
+        self.config = config
         self.oauth = oauth
         self.content = None
         self.nav = None
-        self.active = True
 
+        self.active = True
         self._header_window = None
         self._content_window = None
         self._subwindows = None
@@ -52,7 +59,7 @@ class Page(Terminal):
         if ch == 'y':
             sys.exit()
         elif ch != 'n':
-            curses.flash()
+            self.term.flash()
 
     @BaseController.register('Q')
     def force_exit(self):
@@ -141,7 +148,7 @@ class Page(Terminal):
                 self.oauth.clear_oauth_data()
                 self.show_notification('Logged out')
             elif ch != 'n':
-                curses.flash()
+                self.term.flash()
         else:
             self.oauth.authorize()
 
@@ -154,7 +161,7 @@ class Page(Terminal):
 
         data = self.content.get(self.nav.absolute_index)
         if data.get('author') != self.reddit.user.name:
-            curses.flash()
+            self.term.flash()
             return
 
         prompt = 'Are you sure you want to delete this? (y/n): '
@@ -178,7 +185,7 @@ class Page(Terminal):
 
         data = self.content.get(self.nav.absolute_index)
         if data.get('author') != self.reddit.user.name:
-            curses.flash()
+            self.term.flash()
             return
 
         if data['type'] == 'Submission':
@@ -189,10 +196,10 @@ class Page(Terminal):
             content = data['body']
             info = COMMENT_EDIT_FILE.format(content=content)
         else:
-            curses.flash()
+            self.term.flash()
             return
 
-        text = open_editor(info)
+        text = self.term.open_editor(info)
         if text == content:
             self.show_notification('Aborted')
             return
@@ -219,22 +226,23 @@ class Page(Terminal):
         Clear excessive input caused by the scroll wheel or holding down a key
         """
 
-        self.stdscr.nodelay(1)
-        while self.stdscr.getch() != -1:
+        self.term.nodelay(1)
+        while self.term.getch() != -1:
             continue
-        self.stdscr.nodelay(0)
+        self.term.nodelay(0)
 
     def draw(self):
 
-        n_rows, n_cols = self.stdscr.getmaxyx()
-        if n_rows < self.MIN_HEIGHT or n_cols < self.MIN_WIDTH:
+        window = self.term.stdscr
+        n_rows, n_cols = window.getmaxyx()
+        if n_rows < self.term.MIN_HEIGHT or n_cols < self.term.MIN_WIDTH:
             return
 
         # Note: 2 argument form of derwin breaks PDcurses on Windows 7!
-        self._header_window = self.stdscr.derwin(1, n_cols, 0, 0)
-        self._content_window = self.stdscr.derwin(n_rows - 1, n_cols, 1, 0)
+        self._header_window = window.derwin(1, n_cols, 0, 0)
+        self._content_window = window.derwin(n_rows - 1, n_cols, 1, 0)
 
-        self.stdscr.erase()
+        window.erase()
         self._draw_header()
         self._draw_content()
         self._add_cursor()
@@ -313,7 +321,7 @@ class Page(Terminal):
         self._remove_cursor()
         valid, redraw = self.nav.move(direction, len(self._subwindows))
         if not valid:
-            curses.flash()
+            self.term.flash()
 
         # Note: ACS_VLINE doesn't like changing the attribute,
         # so always redraw.
@@ -324,7 +332,7 @@ class Page(Terminal):
         self._remove_cursor()
         valid, redraw = self.nav.move_page(direction, len(self._subwindows)-1)
         if not valid:
-            curses.flash()
+            self.term.flash()
 
         # Note: ACS_VLINE doesn't like changing the attribute,
         # so always redraw.

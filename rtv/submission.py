@@ -4,7 +4,7 @@ import curses
 
 from .content import SubmissionContent
 from .page import Page, Controller
-from .helpers import open_browser, open_editor, logged_in, Navigator, Controller
+from .helpers import logged_in, Navigator, Controller
 from .terminal import Color
 from .docs import COMMENT_FILE
 
@@ -101,8 +101,8 @@ class SubmissionPage(Page):
         content = u'\n'.join([u'# |' + line for line in content.split('\n')])
         comment_info = COMMENT_FILE.format(
             author=data['author'], type=data['type'].lower(), content=content)
-        comment_text = open_editor(comment_info)
 
+        comment_text = self.term.open_editor(comment_info)
         if not comment_text:
             self.show_notification('Aborted')
             return

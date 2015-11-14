@@ -1,15 +1,3 @@
-# -*- coding: utf-8 -*-
-from __future__ import unicode_literals
-
-from rtv.helpers import open_editor, open_browser, logged_in
-
-try:
-    from unittest import mock
-except ImportError:
-    import mock
-
-
-# TODO: Move the controller test
 # def test_humanize_timestamp():
 #
 #     timestamp = time.time() - 30
