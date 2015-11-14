@@ -1,11 +1,11 @@
 import curses
 
 from .content import SubscriptionContent
-from .page import Page, Navigator, BaseController
+from .page import Page, Navigator, Controller
 from .terminal import Color, LoadScreen
 
 
-class SubscriptionController(BaseController):
+class SubscriptionController(Controller):
     character_map = {}
 
 

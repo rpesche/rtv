@@ -9,7 +9,7 @@ from .terminal import Color
 from .docs import COMMENT_FILE
 
 
-class SubmissionController(BaseController):
+class SubmissionController(Controller):
     character_map = {}
 
 

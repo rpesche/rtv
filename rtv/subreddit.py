@@ -4,7 +4,7 @@ import curses
 import requests
 
 from .exceptions import SubredditError, AccountError
-from .page import Navigator, Page, BaseController
+from .page import Page, Controller
 from .submission import SubmissionPage
 from .subscription import SubscriptionPage
 from .content import SubredditContent
@@ -13,7 +13,7 @@ from .terminal import Color
 from .docs import SUBMISSION_FILE
 
 
-class SubredditController(BaseController):
+class SubredditController(Controller):
     character_map = {}
 
 

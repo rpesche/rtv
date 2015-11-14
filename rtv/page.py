@@ -4,9 +4,9 @@ from functools import wraps
 
 from kitchen.text.display import textual_width
 
-from .docs import COMMENT_EDIT_FILE, SUBMISSION_FILE, HELP
 from .helpers import Controller
 from .terminal import Color
+from .docs import COMMENT_EDIT_FILE, SUBMISSION_FILE, HELP
 
 
 def logged_in(f):
@@ -20,10 +20,6 @@ def logged_in(f):
             return
         return f(self, *args, **kwargs)
     return wrapped_method
-
-
-class BaseController(Controller):
-    character_map = {}
 
 
 class Page(object):
@@ -49,7 +45,7 @@ class Page(object):
     def draw_item(window, data, inverted):
         raise NotImplementedError
 
-    @BaseController.register('q')
+    @Controller.register('q')
     def exit(self):
         """
         Prompt to exit the application.
@@ -61,55 +57,55 @@ class Page(object):
         elif ch != 'n':
             self.term.flash()
 
-    @BaseController.register('Q')
+    @Controller.register('Q')
     def force_exit(self):
         sys.exit()
 
-    @BaseController.register('?')
+    @Controller.register('?')
     def help(self):
         self.show_notification(HELP.strip().splitlines())
 
-    @BaseController.register('1')
+    @Controller.register('1')
     def sort_content_hot(self):
         self.refresh_content(order='hot')
 
-    @BaseController.register('2')
+    @Controller.register('2')
     def sort_content_top(self):
         self.refresh_content(order='top')
 
-    @BaseController.register('3')
+    @Controller.register('3')
     def sort_content_rising(self):
         self.refresh_content(order='rising')
 
-    @BaseController.register('4')
+    @Controller.register('4')
     def sort_content_new(self):
         self.refresh_content(order='new')
 
-    @BaseController.register('5')
+    @Controller.register('5')
     def sort_content_controversial(self):
         self.refresh_content(order='controversial')
 
-    @BaseController.register(curses.KEY_UP, 'k')
+    @Controller.register(curses.KEY_UP, 'k')
     def move_cursor_up(self):
         self._move_cursor(-1)
         self.clear_input_queue()
 
-    @BaseController.register(curses.KEY_DOWN, 'j')
+    @Controller.register(curses.KEY_DOWN, 'j')
     def move_cursor_down(self):
         self._move_cursor(1)
         self.clear_input_queue()
 
-    @BaseController.register('n', curses.KEY_NPAGE)
+    @Controller.register('n', curses.KEY_NPAGE)
     def move_page_down(self):
         self._move_page(1)
         self.clear_input_queue()
 
-    @BaseController.register('m', curses.KEY_PPAGE)
+    @Controller.register('m', curses.KEY_PPAGE)
     def move_page_up(self):
         self._move_page(-1)
         self.clear_input_queue()
 
-    @BaseController.register('a')
+    @Controller.register('a')
     @logged_in
     def upvote(self):
         data = self.content.get(self.nav.absolute_index)
@@ -122,7 +118,7 @@ class Page(object):
             data['object'].upvote()
             data['likes'] = True
 
-    @BaseController.register('z')
+    @Controller.register('z')
     @logged_in
     def downvote(self):
         data = self.content.get(self.nav.absolute_index)
@@ -135,7 +131,7 @@ class Page(object):
             data['object'].clear_vote()
             data['likes'] = None
 
-    @BaseController.register('u')
+    @Controller.register('u')
     def login(self):
         """
         Prompt to log into the user's account, or log out of the current
@@ -152,7 +148,7 @@ class Page(object):
         else:
             self.oauth.authorize()
 
-    @BaseController.register('d')
+    @Controller.register('d')
     @logged_in
     def delete(self):
         """
@@ -176,7 +172,7 @@ class Page(object):
         if self.loader.exception is None:
             self.refresh_content()
 
-    @BaseController.register('e')
+    @Controller.register('e')
     @logged_in
     def edit(self):
         """
@@ -210,7 +206,7 @@ class Page(object):
         if self.loader.exception is None:
             self.refresh_content()
 
-    @BaseController.register('i')
+    @Controller.register('i')
     @logged_in
     def get_inbox(self):
         """

@@ -5,8 +5,8 @@ import praw
 import requests
 from kitchen.text.display import wrap
 
-from .exceptions import (SubmissionError, SubredditError, SubscriptionError,
-                         AccountError)
+from .exceptions import (
+    SubmissionError, SubredditError, SubscriptionError, AccountError)
 
 
 class Content(object):

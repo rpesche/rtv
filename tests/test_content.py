@@ -1,3 +1,32 @@
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals
+
+from rtv.content import SubscriptionContent
+from rtv.oauth import OAuthHelper
+
+import vcr
+import praw
+
+try:
+    from unittest import mock
+except ImportError:
+    import mock
+
+
+def test_content_helpers(terminal, config):
+
+    with vcr.use_cassette('fixtures/cassettes/rtv.yaml', record_mode='all'):
+        config.load_refresh_token()
+
+        reddit = praw.Reddit(
+            user_agent='rtv test suite',
+            decode_html_entities=False)
+        reddit.set_oauth_app_info(
+            config['oauth_client_id'],
+            config['oauth_client_secret'],
+            config['oauth_redirect_uri'])
+        reddit.refresh_access_information(config.refresh_token)
+
 # def test_humanize_timestamp():
 #
 #     timestamp = time.time() - 30
