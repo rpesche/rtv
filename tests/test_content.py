@@ -1,14 +1,14 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
-import six
-import praw
 import time
-from vcr import VCR
 
-from rtv.oauth import OAuthHelper
-from rtv.content import (Content, SubmissionContent, SubscriptionContent,
-                         SubredditContent)
+import six
+import pytest
+
+from rtv.exceptions import SubmissionError
+from rtv.content import (
+    Content, SubmissionContent, SubscriptionContent, SubredditContent)
 
 try:
     from unittest import mock
@@ -40,13 +40,82 @@ def test_wrap_text():
     assert Content.wrap_text('\n\n\n\n', 70) == ['', '', '', '']
 
 
-def test_content_submission_post(reddit, terminal):
+def test_content_submission_initialize(reddit, terminal):
 
-    submission = next(reddit.get_top())
+    url = 'https://www.reddit.com/r/Python/comments/2xmo63/'
+    submission = reddit.get_submission(url)
+    content = SubmissionContent(submission, terminal.loader, indent_size=3,
+                                max_indent_level=4, order='top')
+    assert content.indent_size == 3
+    assert content.max_indent_level == 4
+    assert content.order == 'top'
+    assert content.name is not None
+
+
+def test_content_submission(reddit, terminal):
+
+    url = 'https://www.reddit.com/r/Python/comments/2xmo63/'
+    submission = reddit.get_submission(url)
     content = SubmissionContent(submission, terminal.loader)
 
-    # Everything should be converted to unicode by this point
+    # Everything is loaded upon instantiation
+    assert len(content._comment_data) == 45
+    assert content.get(-1)['type'] == 'Submission'
+    assert content.get(40)['type'] == 'Comment'
+
     for data in content.iterate(-1, 1):
+        assert all(k in data for k in ('object', 'n_rows', 'offset', 'type'))
+        # All text should be converted to unicode by this point
         for val in data.values():
             assert not isinstance(val, six.binary_type)
-        break
+
+    # Out of bounds
+    with pytest.raises(IndexError):
+        content.get(-2)
+    with pytest.raises(IndexError):
+        content.get(50)
+
+    # Toggling the submission doesn't do anything
+    content.toggle(-1)
+    assert len(content._comment_data) == 45
+
+    # Toggling a comment hides its 3 children
+    content.toggle(2)
+    data = content.get(2)
+    assert data['type'] == 'HiddenComment'
+    assert data['count'] == 3
+    assert data['level'] >= content.get(3)['level']
+    assert len(content._comment_data) == 43
+
+    # Toggling again expands the children
+    content.toggle(2)
+    assert len(content._comment_data) == 45
+
+
+def test_content_submission_load_more_comments(reddit, terminal):
+
+    url = 'https://www.reddit.com/r/AskReddit/comments/2np694/'
+    submission = reddit.get_submission(url)
+    content = SubmissionContent(submission, terminal.loader)
+    assert len(content._comment_data) == 391
+
+    # More comments load when toggled
+    assert content.get(390)['type'] == 'MoreComments'
+    content.toggle(390)
+    assert len(content._comment_data) > 390
+    assert content.get(390)['type'] == 'Comment'
+
+
+def test_content_submission_from_url(reddit, terminal):
+
+    url = 'https://www.reddit.com/r/AskReddit/comments/2np694/'
+    SubmissionContent.from_url(reddit, url, terminal.loader)
+    SubmissionContent.from_url(reddit, url, terminal.loader, order='new')
+
+    # Invalid sorting order doesn't raise an exception
+    SubmissionContent.from_url(reddit, url, terminal.loader, order='fake')
+
+    # Invalid comment URL
+    # TODO: How does it work now that this is caught in the loader?
+    # Need to be more careful about handling exceptions
+    SubmissionContent.from_url(reddit, url[:-2], terminal.loader)

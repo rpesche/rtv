@@ -6,12 +6,15 @@ import time
 import curses
 import inspect
 import weakref
+import logging
 import threading
 from contextlib import contextmanager
 
 import six
 import praw
 import requests
+
+_logger = logging.getLogger(__name__)
 
 
 @contextmanager

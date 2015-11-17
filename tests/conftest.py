@@ -18,7 +18,7 @@ try:
 except ImportError:
     import mock
 
-RECORD = True
+RECORDED = True
 REFRESH_TOKEN = open('tests/refresh-token').read()
 
 # Turn on autospec by default for convenience
@@ -75,7 +75,7 @@ def vcr():
     # https://github.com/kevin1024/vcrpy/pull/196
     cassette_dir = os.path.join(os.path.dirname(__file__), 'cassettes')
     vcr = VCR(
-        record_mode='all' if RECORD else 'none',
+        record_mode='none' if RECORDED else 'all',
         filter_headers=[('Authorization', '**********')],
         filter_post_data_parameters=[('refresh_token', '**********')],
         match_on=['uri', 'method', 'body', 'refresh_token'],
@@ -86,7 +86,7 @@ def vcr():
 
 @pytest.fixture()
 def refresh_token():
-    return REFRESH_TOKEN if RECORD else 'mock_refresh_token'
+    return 'mock_refresh_token' if RECORDED else REFRESH_TOKEN
 
 
 @pytest.yield_fixture()
@@ -120,11 +120,14 @@ def stdscr():
 @pytest.yield_fixture()
 def reddit(vcr, request):
 
-    cassette_name = '%s.yaml' %request.module.__name__.split('.')[-1]
+    cassette_name = '%s.yaml' % request.module.__name__.split('.')[-1]
     with vcr.use_cassette(cassette_name):
         with patch('praw.Reddit.get_access_information'):
-            yield praw.Reddit(user_agent='rtv test suite',
-                              decode_html_entities=False)
+            reddit = praw.Reddit(user_agent='rtv test suite',
+                                 decode_html_entities=False)
+            if RECORDED:
+                reddit.config.api_request_delay = 0
+            yield reddit
 
 
 @pytest.yield_fixture()

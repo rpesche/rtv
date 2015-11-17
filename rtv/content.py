@@ -320,7 +320,7 @@ class SubmissionContent(Content):
                 self._comment_data[index:index + 1] = comment_data
 
         else:
-            raise ValueError('% type not recognized' % data['type'])
+            raise ValueError('%s type not recognized' % data['type'])
 
 
 class SubredditContent(Content):
