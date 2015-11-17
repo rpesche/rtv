@@ -25,16 +25,14 @@ def test_terminal_mobile_authorize(reddit, terminal, config):
     assert '.compact' in oauth.reddit.config.API_PATHS['authorize']
 
 
-def test_authorize_with_refresh_token(oauth):
+def test_authorize_with_refresh_token(oauth, refresh_token):
 
-    # If there is already a refresh token skip the OAuth process
-    oauth.config.refresh_token = 'secrettoken'
+    oauth.config.refresh_token = refresh_token
     oauth.authorize()
-    assert oauth.reddit.refresh_access_information.called
     assert oauth.http_server is None
 
 
-def test_authorize(oauth, reddit, stdscr):
+def test_authorize(oauth, reddit, stdscr, refresh_token):
 
     # Because we use `from .helpers import open_browser` we have to patch the
     # function in the destination oauth module and not the helpers module
@@ -66,9 +64,9 @@ def test_authorize(oauth, reddit, stdscr):
         oauth.http_server = None
 
         # The next authorization should skip the oauth process
+        oauth.config.refresh_token = refresh_token
         oauth.authorize()
-        oauth.reddit.refresh_access_information.assert_called_with(
-            reddit, oauth.config.refresh_token)
+        assert oauth.reddit.user is not None
         assert oauth.http_server is None
         stdscr.reset_mock()
 

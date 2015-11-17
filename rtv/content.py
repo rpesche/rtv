@@ -1,6 +1,10 @@
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals
+
 import re
 from datetime import datetime
 
+import six
 import praw
 import requests
 from kitchen.text.display import wrap
@@ -14,7 +18,7 @@ class Content(object):
     def get(self, index, n_cols):
         raise NotImplementedError
 
-    def iterate(self, index, step, n_cols):
+    def iterate(self, index, step, n_cols=70):
 
         while True:
             if step < 0 and index < 0:
@@ -60,8 +64,8 @@ class Content(object):
             retval.append(item)
         return retval
 
-    @staticmethod
-    def strip_praw_comment(comment):
+    @classmethod
+    def strip_praw_comment(cls, comment):
         """
         Parse through a submission comment and return a dict with data ready to
         be displayed through the terminal.
@@ -86,7 +90,7 @@ class Content(object):
 
             data['type'] = 'Comment'
             data['body'] = comment.body
-            data['created'] = self.humanize_timestamp(comment.created_utc)
+            data['created'] = cls.humanize_timestamp(comment.created_utc)
             data['score'] = '{} pts'.format(comment.score)
             data['author'] = name
             data['is_author'] = (name == sub_name)
@@ -97,8 +101,8 @@ class Content(object):
 
         return data
 
-    @staticmethod
-    def strip_praw_submission(sub):
+    @classmethod
+    def strip_praw_submission(cls, sub):
         """
         Parse through a submission and return a dict with data ready to be
         displayed through the terminal.
@@ -121,12 +125,12 @@ class Content(object):
         data['type'] = 'Submission'
         data['title'] = sub.title
         data['text'] = sub.selftext
-        data['created'] = self.humanize_timestamp(sub.created_utc)
+        data['created'] = cls.humanize_timestamp(sub.created_utc)
         data['comments'] = '{} comments'.format(sub.num_comments)
         data['score'] = '{} pts'.format(sub.score)
         data['author'] = name
         data['permalink'] = sub.permalink
-        data['subreddit'] = str(sub.subreddit)
+        data['subreddit'] = six.text_type(sub.subreddit)
         data['flair'] = flair
         data['url_full'] = sub.url
         data['likes'] = sub.likes
@@ -253,8 +257,8 @@ class SubmissionContent(Content):
 
         elif index == -1:
             data = self._submission_data
-            data['split_title'] = wrap_text(data['title'], width=n_cols-2)
-            data['split_text'] = wrap_text(data['text'], width=n_cols-2)
+            data['split_title'] = self.wrap_text(data['title'], width=n_cols-2)
+            data['split_text'] = self.wrap_text(data['text'], width=n_cols-2)
             data['n_rows'] = len(data['split_title'] + data['split_text']) + 5
             data['offset'] = 0
 
@@ -265,7 +269,7 @@ class SubmissionContent(Content):
 
             if data['type'] == 'Comment':
                 width = n_cols - data['offset']
-                data['split_body'] = wrap_text(data['body'], width=width)
+                data['split_body'] = self.wrap_text(data['body'], width=width)
                 data['n_rows'] = len(data['split_body']) + 1
             else:
                 data['n_rows'] = 1
@@ -425,7 +429,7 @@ class SubredditContent(Content):
 
         # Modifies the original dict, faster than copying
         data = self._submission_data[index]
-        data['split_title'] = wrap_text(data['title'], width=n_cols)
+        data['split_title'] = self.wrap_text(data['title'], width=n_cols)
         data['n_rows'] = len(data['split_title']) + 3
         data['offset'] = 0
 
@@ -472,7 +476,7 @@ class SubscriptionContent(Content):
                 self._subscription_data.append(data)
 
         data = self._subscription_data[index]
-        data['split_title'] = wrap_text(data['title'], width=n_cols)
+        data['split_title'] = self.wrap_text(data['title'], width=n_cols)
         data['n_rows'] = len(data['split_title']) + 1
         data['offset'] = 0
 

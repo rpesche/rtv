@@ -1,20 +1,25 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
-import praw
-import pytest
 import curses
 from functools import partial
+
+import os
+import praw
+import pytest
+from vcr import VCR
 
 from rtv.config import Config
 from rtv.terminal import Terminal
 from rtv.oauth import OAuthHelper
 
-
 try:
     from unittest import mock
 except ImportError:
     import mock
+
+RECORD = True
+REFRESH_TOKEN = open('tests/refresh-token').read()
 
 # Turn on autospec by default for convenience
 patch = partial(mock.patch, autospec=True)
@@ -60,6 +65,30 @@ class MockStdscr(mock.MagicMock):
         return self.subwin
 
 
+@pytest.fixture(scope='session')
+def vcr():
+
+    def matcher(r1, r2):
+        return (r1.headers.get('authorization') ==
+                r2.headers.get('authorization'))
+
+    # https://github.com/kevin1024/vcrpy/pull/196
+    cassette_dir = os.path.join(os.path.dirname(__file__), 'cassettes')
+    vcr = VCR(
+        record_mode='all' if RECORD else 'none',
+        filter_headers=[('Authorization', '**********')],
+        filter_post_data_parameters=[('refresh_token', '**********')],
+        match_on=['uri', 'method', 'body', 'refresh_token'],
+        cassette_library_dir=cassette_dir)
+    vcr.register_matcher('refresh_token', matcher)
+    return vcr
+
+
+@pytest.fixture()
+def refresh_token():
+    return REFRESH_TOKEN if RECORD else 'mock_refresh_token'
+
+
 @pytest.yield_fixture()
 def config():
     with patch('rtv.config.Config.save_refresh_token'), \
@@ -89,11 +118,13 @@ def stdscr():
 
 
 @pytest.yield_fixture()
-def reddit():
-    with patch('praw.Reddit.refresh_access_information'), \
-            patch('praw.Reddit.get_access_information'):
-        yield praw.Reddit(user_agent='rtv test suite',
-                          decode_html_entities=False)
+def reddit(vcr, request):
+
+    cassette_name = '%s.yaml' %request.module.__name__.split('.')[-1]
+    with vcr.use_cassette(cassette_name):
+        with patch('praw.Reddit.get_access_information'):
+            yield praw.Reddit(user_agent='rtv test suite',
+                              decode_html_entities=False)
 
 
 @pytest.yield_fixture()

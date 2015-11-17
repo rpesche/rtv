@@ -1,6 +1,7 @@
 import time
 import curses
 
+import six
 import requests
 
 from .exceptions import SubredditError, AccountError
@@ -135,7 +136,7 @@ class SubredditPage(Page):
         # Strips the subreddit to just the name
         # Make sure it is a valid subreddit for submission
         subreddit = self.reddit.get_subreddit(self.content.name)
-        sub = str(subreddit).split('/')[2]
+        sub = six.text_type(subreddit).split('/')[2]
         if '+' in sub or sub in ('all', 'front', 'me'):
             self.show_notification('Invalid subreddit')
             return
