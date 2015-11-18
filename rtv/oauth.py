@@ -5,7 +5,6 @@ import time
 import uuid
 from functools import wraps
 
-from praw.errors import OAuthAppRequired, OAuthException
 from tornado import gen, ioloop, web, httpserver
 from concurrent.futures import ThreadPoolExecutor
 
@@ -75,7 +74,7 @@ class OAuthHelper(object):
             with self.term.loader(message='Logging in'):
                 self.reddit.refresh_access_information(
                     self.config.refresh_token)
-                return
+            return
 
         # https://github.com/tornadoweb/tornado/issues/1420
         io = ioloop.IOLoop.current()
@@ -96,6 +95,8 @@ class OAuthHelper(object):
             with self.term.loader(message='Waiting for authorization'):
                 self.term.open_browser(authorize_url)
                 io.start()
+            if self.term.loader.exception:
+                return
         else:
             # Open the terminal webbrowser in a background thread and wait
             # while for the user to close the process. Once the process is
@@ -120,11 +121,9 @@ class OAuthHelper(object):
             self.term.show_notification('UUID mismatch')
             return
 
-        try:
-            with self.term.loader(message='Logging in'):
-                info = self.reddit.get_access_information(self.params['code'])
-        except (OAuthAppRequired, OAuthException):
-            self.term.show_notification('Invalid OAuth data')
+        with self.term.loader(message='Logging in'):
+            info = self.reddit.get_access_information(self.params['code'])
+        if self.term.loader.exception:
             return
 
         message = 'Welcome {}!'.format(self.reddit.user.name)

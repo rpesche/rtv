@@ -237,14 +237,10 @@ class SubmissionContent(Content):
     def from_url(cls, reddit, url, loader, indent_size=2, max_indent_level=8,
                  order=None):
 
-        try:
-            with loader():
-                url = url.replace('http:', 'https:')
-                submission = reddit.get_submission(url, comment_sort=order)
-        except (praw.errors.APIException, praw.errors.NotFound):
-            raise SubmissionError('Could not load %s' % url)
-
-        return cls(submission, loader, indent_size, max_indent_level, order)
+        url = url.replace('http:', 'https:')
+        with loader():
+            submission = reddit.get_submission(url, comment_sort=order)
+            return cls(submission, loader, indent_size, max_indent_level, order)
 
     def get(self, index, n_cols=70):
         """
@@ -314,8 +310,8 @@ class SubmissionContent(Content):
         elif data['type'] == 'MoreComments':
             with self._loader():
                 comments = data['object'].comments(update=True)
-                comments = self.flatten_comments(comments,
-                                                 root_level=data['level'])
+            if not self._loader.exception:
+                comments = self.flatten_comments(comments, data['level'])
                 comment_data = [self.strip_praw_comment(c) for c in comments]
                 self._comment_data[index:index + 1] = comment_data
 
@@ -341,13 +337,11 @@ class SubredditContent(Content):
         # This is necessary because PRAW loads submissions lazily, and
         # there is is no other way to check things like multireddits that
         # don't have a real corresponding subreddit object.
-        try:
-            self.get(0)
-        except (praw.errors.APIException, requests.HTTPError,
-                praw.errors.RedirectException, praw.errors.Forbidden,
-                praw.errors.InvalidSubreddit, praw.errors.NotFound,
-                IndexError):
-            raise SubredditError('Could not reach subreddit %s' % name)
+        with self._loader():
+            try:
+                self.get(0)
+            except IndexError:
+                raise praw.errors.NotFound()
 
     @classmethod
     def from_name(cls, reddit, name, loader, order=None, query=None):
@@ -418,6 +412,9 @@ class SubredditContent(Content):
             try:
                 with self._loader():
                     submission = next(self._submissions)
+                if self._loader.exception:
+                    # If we can't load any more items, we need to stop
+                    raise StopIteration
             except StopIteration:
                 raise IndexError
             else:
@@ -448,13 +445,10 @@ class SubscriptionContent(Content):
 
     @classmethod
     def from_user(cls, reddit, loader):
-        try:
-            with loader():
-                subscriptions = reddit.get_my_subreddits(limit=None)
-        except praw.errors.APIException:
-            raise SubscriptionError('Unable to load subscriptions')
 
-        return cls(subscriptions, loader)
+        with loader():
+            subscriptions = reddit.get_my_subreddits(limit=None)
+            return cls(subscriptions, loader)
 
     def get(self, index, n_cols=70):
         """
@@ -469,6 +463,9 @@ class SubscriptionContent(Content):
             try:
                 with self._loader():
                     subscription = next(self._subscriptions)
+                if self._loader.exception:
+                    # If we can't load any more items, we need to stop
+                    raise StopIteration
             except StopIteration:
                 raise IndexError
             else:

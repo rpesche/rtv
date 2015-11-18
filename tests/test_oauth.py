@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
+from praw.errors import OAuthException
+
 from rtv.oauth import OAuthHelper
 
 try:
@@ -25,10 +27,19 @@ def test_terminal_mobile_authorize(reddit, terminal, config):
     assert '.compact' in oauth.reddit.config.API_PATHS['authorize']
 
 
-def test_authorize_with_refresh_token(oauth, refresh_token):
+def test_authorize_with_refresh_token(oauth, stdscr, refresh_token):
 
     oauth.config.refresh_token = refresh_token
     oauth.authorize()
+    assert oauth.http_server is None
+
+    # We should be able to handle an oauth failure
+    with mock.patch.object(oauth.reddit, 'refresh_access_information'):
+        exception = OAuthException('', '')
+        oauth.reddit.refresh_access_information.side_effect = exception
+        oauth.authorize()
+    message = 'Invalid OAuth data'.encode('utf-8')
+    stdscr.derwin().addstr.assert_called_with(1, 1, message)
     assert oauth.http_server is None
 
 
@@ -94,9 +105,18 @@ def test_authorize(oauth, reddit, stdscr, refresh_token):
         assert oauth.config.save_refresh_token.called
         stdscr.reset_mock()
         oauth.reddit.get_access_information.reset_mock()
+        oauth.config.refresh_token = None
         oauth.config.save_refresh_token.reset_mock()
         oauth.http_server = None
 
+        # Exceptions when logging in are handled correctly
+        with mock.patch.object(oauth.reddit, 'get_access_information'):
+            exception = OAuthException('', '')
+            oauth.reddit.get_access_information.side_effect = exception
+            oauth.authorize()
+        message = 'Invalid OAuth data'.encode('utf-8')
+        stdscr.derwin().addstr.assert_called_with(1, 1, message)
+        assert not oauth.config.save_refresh_token.called
 
 def test_clear_oauth_data(oauth):
 

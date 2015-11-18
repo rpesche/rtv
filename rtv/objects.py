@@ -91,6 +91,18 @@ class LoadScreen(object):
         >>>     self.refresh_content()
     """
 
+    HANDLED_EXCEPTIONS = [
+        (praw.errors.OAuthAppRequired, 'Invalid OAuth data'),
+        (praw.errors.OAuthException, 'Invalid OAuth data'),
+        (praw.errors.ClientException, 'Reddit Client Error'),
+        (praw.errors.NotFound, 'Not Found'),
+        (praw.errors.APIException, 'Reddit API Error'),
+        (praw.errors.HTTPException, 'Reddit HTTP Error'),
+        (requests.HTTPError, 'Unexpected HTTP Error'),
+        (requests.ConnectionError, 'Connection Error'),
+        (KeyboardInterrupt, None),
+    ]
+
     def __init__(self, terminal):
 
         self.exception = None
@@ -120,7 +132,6 @@ class LoadScreen(object):
 
         self._animator = threading.Thread(target=self.animate, args=self._args)
         self._animator.daemon = True
-
         self._is_running = True
         self._animator.start()
         return self
@@ -131,31 +142,22 @@ class LoadScreen(object):
         self._animator.join()
         self._terminal.stdscr.refresh()
 
-        if isinstance(e, praw.errors.APIException):
-            message = ['Error: {}'.format(e.error_type), e.message]
-            self._terminal.show_notification(message)
+        if e is not None:
+            # Log the exception and attach it so the caller can inspect it
             self.exception = e
-            _logger.exception(e)
-            return True
-        elif isinstance(e, praw.errors.ClientException):
-            message = ['Error: Client Exception', e.message]
-            self._terminal.show_notification(message)
-            self.exception = e
-            _logger.exception(e)
-            return True
-        elif isinstance(e, requests.HTTPError):
-            self._terminal.show_notification('Unexpected Error')
-            self.exception = e
-            _logger.exception(e)
-            return True
-        elif isinstance(e, requests.ConnectionError):
-            self._terminal.show_notification('Unexpected Error')
-            self.exception = e
-            _logger.exception(e)
-            return True
-        elif isinstance(e, KeyboardInterrupt):
-            self.exception = e
-            return True
+            if not isinstance(e, KeyboardInterrupt):
+                _logger.exception(e)
+
+            # If an error occurred, display a notification on the screen
+            for base, message in self.HANDLED_EXCEPTIONS:
+                if isinstance(e, base):
+                    if message:
+                        self._terminal.show_notification(message)
+                    break
+            else:
+                return False  # Re-raise unhandled exceptions
+            return True  # Otherwise swallow the exception and continue
+
 
     def animate(self, delay, interval, message, trail):
 

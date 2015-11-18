@@ -4,6 +4,7 @@ from __future__ import unicode_literals
 import time
 
 import six
+import praw
 import pytest
 
 from rtv.exceptions import SubmissionError
@@ -114,8 +115,10 @@ def test_content_submission_from_url(reddit, terminal):
 
     # Invalid sorting order doesn't raise an exception
     SubmissionContent.from_url(reddit, url, terminal.loader, order='fake')
+    assert not terminal.loader.exception
 
     # Invalid comment URL
-    # TODO: How does it work now that this is caught in the loader?
-    # Need to be more careful about handling exceptions
-    SubmissionContent.from_url(reddit, url[:-2], terminal.loader)
+    content = SubmissionContent.from_url(reddit, url[:-2], terminal.loader)
+    assert content is None
+    assert isinstance(terminal.loader.exception, praw.errors.NotFound)
+    terminal.stdscr.derwin().addstr.assert_called_with(1, 1, 'Not Found')

@@ -5,6 +5,7 @@ import time
 import curses
 
 import pytest
+import requests
 
 from rtv.objects import Color, LoadScreen, curses_session
 
@@ -37,6 +38,18 @@ def test_load_screen(terminal, stdscr, ascii):
     stdscr.reset_mock()
 
     # Raising a handled exception should get stored on the loaders
+    with terminal.loader(delay=0):
+        assert terminal.loader._animator.is_alive()
+        raise requests.ConnectionError
+    assert not terminal.loader._is_running
+    assert not terminal.loader._animator.is_alive()
+    assert isinstance(terminal.loader.exception, requests.ConnectionError)
+    error_message = 'Connection Error'.encode('ascii' if ascii else 'utf-8')
+    stdscr.derwin().addstr.assert_called_with(1, 1, error_message)
+    stdscr.refresh.assert_called()
+    stdscr.reset_mock()
+
+    # Raising a KeyboardInterrupt should be also be stored
     with terminal.loader(delay=0):
         assert terminal.loader._animator.is_alive()
         raise KeyboardInterrupt()
