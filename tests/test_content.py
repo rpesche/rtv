@@ -3,13 +3,10 @@ from __future__ import unicode_literals
 
 import time
 
-import six
 import praw
 import pytest
 
-from rtv.exceptions import SubmissionError
-from rtv.content import (
-    Content, SubmissionContent, SubscriptionContent, SubredditContent)
+from rtv.content import *
 
 try:
     from unittest import mock
@@ -121,4 +118,24 @@ def test_content_submission_from_url(reddit, terminal):
     content = SubmissionContent.from_url(reddit, url[:-2], terminal.loader)
     assert content is None
     assert isinstance(terminal.loader.exception, praw.errors.NotFound)
-    terminal.stdscr.derwin().addstr.assert_called_with(1, 1, 'Not Found')
+    message = 'Not Found'.encode('utf-8')
+    terminal.stdscr.derwin().addstr.assert_called_with(1, 1, message)
+
+
+def test_content_subreddit_initialize(reddit, terminal):
+
+    submissions = reddit.get_subreddit('python').get_top(limit=None)
+    content = SubredditContent('python', submissions, terminal.loader, 'top')
+    assert content.name == 'python'
+    assert content.order == 'top'
+    assert len(content._submission_data) == 1
+
+
+def test_content_subreddit_initialize_invalid(reddit, terminal):
+
+    submissions = reddit.get_subreddit('invalidsubreddit7').get_top(limit=None)
+    content = SubredditContent('python', submissions, terminal.loader, 'top')
+    assert len(content._submission_data) == 0
+    assert isinstance(terminal.loader.exception, praw.errors.InvalidSubreddit)
+    message = 'Invalid Subreddit'.encode('utf-8')
+    terminal.stdscr.subwin.addstr.assert_called_with(1, 1, message)

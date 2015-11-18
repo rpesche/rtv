@@ -341,7 +341,7 @@ class SubredditContent(Content):
             try:
                 self.get(0)
             except IndexError:
-                raise praw.errors.NotFound()
+                raise praw.errors.InvalidSubreddit()
 
     @classmethod
     def from_name(cls, reddit, name, loader, order=None, query=None):
@@ -410,11 +410,7 @@ class SubredditContent(Content):
 
         while index >= len(self._submission_data):
             try:
-                with self._loader():
-                    submission = next(self._submissions)
-                if self._loader.exception:
-                    # If we can't load any more items, we need to stop
-                    raise StopIteration
+                submission = next(self._submissions)
             except StopIteration:
                 raise IndexError
             else:
@@ -461,11 +457,7 @@ class SubscriptionContent(Content):
 
         while index >= len(self._subscription_data):
             try:
-                with self._loader():
-                    subscription = next(self._subscriptions)
-                if self._loader.exception:
-                    # If we can't load any more items, we need to stop
-                    raise StopIteration
+                subscription = next(self._subscriptions)
             except StopIteration:
                 raise IndexError
             else:

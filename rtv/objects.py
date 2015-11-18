@@ -14,6 +14,8 @@ import six
 import praw
 import requests
 
+from . import exceptions
+
 _logger = logging.getLogger(__name__)
 
 
@@ -92,6 +94,9 @@ class LoadScreen(object):
     """
 
     HANDLED_EXCEPTIONS = [
+        (praw.errors.InvalidSubreddit, 'Invalid Subreddit'),
+        (praw.errors.InvalidComment, 'Invalid Comment'),
+        (praw.errors.InvalidSubmission, 'Invalid Submission'),
         (praw.errors.OAuthAppRequired, 'Invalid OAuth data'),
         (praw.errors.OAuthException, 'Invalid OAuth data'),
         (praw.errors.ClientException, 'Reddit Client Error'),
@@ -123,6 +128,13 @@ class LoadScreen(object):
             trail (str): Trail of characters that will be animated by the
                 loading screen.
         """
+
+        # Protect against the possibility of nested loaders, e.g.
+        # >>> with loader():
+        # >>>     with loader():
+        # >>>         ...
+        # Doing this results in undefined behavior so it is not allowed
+        assert not self._is_running
 
         self.exception = None
         self._args = (delay, interval, message, trail)
@@ -157,7 +169,6 @@ class LoadScreen(object):
             else:
                 return False  # Re-raise unhandled exceptions
             return True  # Otherwise swallow the exception and continue
-
 
     def animate(self, delay, interval, message, trail):
 

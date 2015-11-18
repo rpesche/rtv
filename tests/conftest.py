@@ -18,11 +18,14 @@ try:
 except ImportError:
     import mock
 
-RECORDED = True
-REFRESH_TOKEN = open('tests/refresh-token').read()
-
 # Turn on autospec by default for convenience
 patch = partial(mock.patch, autospec=True)
+
+
+def pytest_addoption(parser):
+    parser.addoption('--record-mode', dest='record_mode', default='none')
+    parser.addoption('--refresh-token', dest='refresh_token',
+                     default='tests/refresh-token')
 
 
 class MockStdscr(mock.MagicMock):
@@ -66,7 +69,7 @@ class MockStdscr(mock.MagicMock):
 
 
 @pytest.fixture(scope='session')
-def vcr():
+def vcr(request):
 
     def matcher(r1, r2):
         return (r1.headers.get('authorization') ==
@@ -75,7 +78,7 @@ def vcr():
     # https://github.com/kevin1024/vcrpy/pull/196
     cassette_dir = os.path.join(os.path.dirname(__file__), 'cassettes')
     vcr = VCR(
-        record_mode='none' if RECORDED else 'all',
+        record_mode=request.config.option.record_mode,
         filter_headers=[('Authorization', '**********')],
         filter_post_data_parameters=[('refresh_token', '**********')],
         match_on=['uri', 'method', 'body', 'refresh_token'],
@@ -85,8 +88,11 @@ def vcr():
 
 
 @pytest.fixture()
-def refresh_token():
-    return 'mock_refresh_token' if RECORDED else REFRESH_TOKEN
+def refresh_token(request):
+    if request.config.option.record_mode == 'none':
+        return 'mock_refresh_token'
+    else:
+        return open(request.config.option.refresh_token).read()
 
 
 @pytest.yield_fixture()
@@ -125,7 +131,7 @@ def reddit(vcr, request):
         with patch('praw.Reddit.get_access_information'):
             reddit = praw.Reddit(user_agent='rtv test suite',
                                  decode_html_entities=False)
-            if RECORDED:
+            if request.config.option.record_mode == 'none':
                 reddit.config.api_request_delay = 0
             yield reddit
 
