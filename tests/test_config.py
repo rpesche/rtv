@@ -72,7 +72,7 @@ def test_config_from_file():
         config.from_file()
         assert config.config == {}
 
-        rows = ['{}={}'.format(key, val) for key, val in args.items()]
+        rows = ['{0}={1}'.format(key, val) for key, val in args.items()]
         data = '\n'.join(['[rtv]'] + rows)
         fp.write(codecs.encode(data, 'utf-8'))
         fp.flush()

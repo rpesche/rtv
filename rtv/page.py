@@ -1,10 +1,11 @@
-import time
 import sys
+import time
+import curses
 from functools import wraps
 
 from kitchen.text.display import textual_width
 
-from .helpers import Controller
+from .objects import Controller
 from .terminal import Color
 from .docs import COMMENT_EDIT_FILE, SUBMISSION_FILE, HELP
 
@@ -51,7 +52,7 @@ class Page(object):
         Prompt to exit the application.
         """
 
-        ch = self.prompt_input('Do you really want to quit? (y/n): ')
+        ch = self.term.prompt_input('Do you really want to quit? (y/n): ')
         if ch == 'y':
             sys.exit()
         elif ch != 'n':
@@ -62,8 +63,8 @@ class Page(object):
         sys.exit()
 
     @Controller.register('?')
-    def help(self):
-        self.show_notification(HELP.strip().splitlines())
+    def show_help(self):
+        self.term.show_notification(HELP.strip().splitlines())
 
     @Controller.register('1')
     def sort_content_hot(self):
@@ -139,10 +140,10 @@ class Page(object):
         """
 
         if self.reddit.is_oauth_session():
-            ch = self.prompt_input('Log out? (y/n): ')
+            ch = self.term.prompt_input('Log out? (y/n): ')
             if ch == 'y':
                 self.oauth.clear_oauth_data()
-                self.show_notification('Logged out')
+                self.term.show_notification('Logged out')
             elif ch != 'n':
                 self.term.flash()
         else:
@@ -161,15 +162,15 @@ class Page(object):
             return
 
         prompt = 'Are you sure you want to delete this? (y/n): '
-        char = self.prompt_input(prompt)
+        char = self.term.prompt_input(prompt)
         if char != 'y':
-            self.show_notification('Aborted')
+            self.term.show_notification('Aborted')
             return
 
-        with self.loader(message='Deleting', delay=0):
+        with self.term.loader(message='Deleting', delay=0):
             data['object'].delete()
             time.sleep(2.0)
-        if self.loader.exception is None:
+        if self.term.loader.exception is None:
             self.refresh_content()
 
     @Controller.register('e')
@@ -197,13 +198,13 @@ class Page(object):
 
         text = self.term.open_editor(info)
         if text == content:
-            self.show_notification('Aborted')
+            self.term.show_notification('Aborted')
             return
 
-        with self.loader(message='Editing', delay=0):
+        with self.term.loader(message='Editing', delay=0):
             data['object'].edit(text)
             time.sleep(2.0)
-        if self.loader.exception is None:
+        if self.term.loader.exception is None:
             self.refresh_content()
 
     @Controller.register('i')
@@ -215,7 +216,7 @@ class Page(object):
 
         inbox = len(list(self.reddit.get_unread(limit=1)))
         message = 'New Messages' if inbox > 0 else 'No New Messages'
-        self.show_notification(message)
+        self.term.show_notification(message)
 
     def clear_input_queue(self):
         """
@@ -252,17 +253,17 @@ class Page(object):
         self._header_window.bkgd(' ', attr)
 
         sub_name = self.content.name.replace('/r/front', 'Front Page')
-        self.add_line(self._header_window, sub_name, 0, 0)
+        self.term.add_line(self._header_window, sub_name, 0, 0)
         if self.content.order is not None:
             order = ' [{}]'.format(self.content.order)
-            self.add_line(self._header_window, order)
+            self.term.add_line(self._header_window, order)
 
         if self.reddit.user is not None:
             username = self.reddit.user.name
             s_col = (n_cols - textual_width(username) - 1)
             # Only print username if it fits in the empty space on the right
             if (s_col - 1) >= textual_width(sub_name):
-                self.add_line(self._header_window, username, 0, s_col)
+                self.term.add_line(self._header_window, username, 0, s_col)
 
         self._header_window.refresh()
 

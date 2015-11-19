@@ -3,8 +3,8 @@ import time
 import curses
 
 from .content import SubmissionContent
-from .page import Page, Controller
-from .helpers import logged_in, Navigator, Controller
+from .page import Page, logged_in
+from .objects import Navigator, Controller
 from .terminal import Color
 from .docs import COMMENT_FILE
 

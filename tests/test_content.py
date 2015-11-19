@@ -6,7 +6,8 @@ from itertools import islice
 
 import pytest
 
-from rtv.content import *
+from rtv.content import (
+    Content, SubmissionContent, SubredditContent, SubscriptionContent)
 
 try:
     from unittest import mock

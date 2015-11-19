@@ -1,8 +1,9 @@
 import curses
 
+from .page import Page
 from .content import SubscriptionContent
-from .page import Page, Navigator, Controller
-from .terminal import Color, LoadScreen
+from .objects import Navigator, Controller
+from .terminal import Color
 
 
 class SubscriptionController(Controller):

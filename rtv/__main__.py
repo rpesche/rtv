@@ -12,7 +12,7 @@ from requests.exceptions import RequestException
 
 from .config import Config
 from .exceptions import RTVError
-from .terminal import curses_session
+from .objects import curses_session
 from .subreddit import SubredditPage
 from .terminal import Terminal
 from .docs import AGENT
@@ -75,7 +75,7 @@ def main():
             page.loop()
     except (RequestException, PRAWException, RTVError) as e:
         _logger.exception(e)
-        print('{}: {}'.format(type(e).__name__, e))
+        print('{0}: {1}'.format(type(e).__name__, e))
     except KeyboardInterrupt:
         pass
     finally:

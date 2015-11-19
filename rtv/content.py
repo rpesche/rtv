@@ -415,7 +415,7 @@ class SubredditContent(Content):
                 data = self.strip_praw_submission(submission)
                 data['index'] = index
                 # Add the post number to the beginning of the title
-                data['title'] = u'{}. {}'.format(index+1, data['title'])
+                data['title'] = '{0}. {1}'.format(index+1, data['title'])
                 self._submission_data.append(data)
 
         # Modifies the original dict, faster than copying

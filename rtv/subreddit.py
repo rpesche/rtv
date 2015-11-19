@@ -5,11 +5,11 @@ import six
 import requests
 
 from .exceptions import SubredditError, AccountError
-from .page import Page, Controller
+from .page import Page, logged_in
+from .objects import Navigator, Controller
 from .submission import SubmissionPage
 from .subscription import SubscriptionPage
 from .content import SubredditContent
-from .helpers import logged_in
 from .terminal import Color
 from .docs import SUBMISSION_FILE
 
