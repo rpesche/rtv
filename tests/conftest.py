@@ -23,7 +23,7 @@ patch = partial(mock.patch, autospec=True)
 
 
 def pytest_addoption(parser):
-    parser.addoption('--record-mode', dest='record_mode', default='none')
+    parser.addoption('--record-mode', dest='record_mode', default='all')
     parser.addoption('--refresh-token', dest='refresh_token',
                      default='tests/refresh-token')
 
