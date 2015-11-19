@@ -12,9 +12,7 @@ from rtv.objects import Color, LoadScreen, curses_session
 
 @pytest.mark.parametrize('ascii', [True, False])
 def test_load_screen(terminal, stdscr, ascii):
-
     terminal.ascii = ascii
-    window = stdscr.derwin()
 
     # Ensure the thread is properly started/stopped
     with terminal.loader(delay=0, message=u'Hello', trail=u'...'):
@@ -22,10 +20,14 @@ def test_load_screen(terminal, stdscr, ascii):
     assert not terminal.loader._is_running
     assert not terminal.loader._animator.is_alive()
     assert terminal.loader.exception is None
-    assert window.ncols == 10
-    assert window.nlines == 3
+    assert stdscr.subwin.ncols == 10
+    assert stdscr.subwin.nlines == 3
     stdscr.refresh.assert_called()
-    stdscr.reset_mock()
+
+
+@pytest.mark.parametrize('ascii', [True, False])
+def test_load_screen_exception_unhandled(terminal, stdscr, ascii):
+    terminal.ascii = ascii
 
     # Raising an exception should clean up the loader properly
     with pytest.raises(Exception):
@@ -35,19 +37,27 @@ def test_load_screen(terminal, stdscr, ascii):
     assert not terminal.loader._is_running
     assert not terminal.loader._animator.is_alive()
     stdscr.refresh.assert_called()
-    stdscr.reset_mock()
+
+
+@pytest.mark.parametrize('ascii', [True, False])
+def test_load_screen_exception_handled(terminal, stdscr, ascii):
+    terminal.ascii = ascii
 
     # Raising a handled exception should get stored on the loaders
     with terminal.loader(delay=0):
         assert terminal.loader._animator.is_alive()
-        raise requests.ConnectionError
+        raise requests.ConnectionError()
     assert not terminal.loader._is_running
     assert not terminal.loader._animator.is_alive()
     assert isinstance(terminal.loader.exception, requests.ConnectionError)
     error_message = 'Connection Error'.encode('ascii' if ascii else 'utf-8')
-    stdscr.derwin().addstr.assert_called_with(1, 1, error_message)
+    stdscr.subwin.addstr.assert_called_with(1, 1, error_message)
     stdscr.refresh.assert_called()
-    stdscr.reset_mock()
+
+
+@pytest.mark.parametrize('ascii', [True, False])
+def test_load_screen_keyboard_interrupt(terminal, stdscr, ascii):
+    terminal.ascii = ascii
 
     # Raising a KeyboardInterrupt should be also be stored
     with terminal.loader(delay=0):
@@ -57,13 +67,56 @@ def test_load_screen(terminal, stdscr, ascii):
     assert not terminal.loader._animator.is_alive()
     assert isinstance(terminal.loader.exception, KeyboardInterrupt)
     stdscr.refresh.assert_called()
-    stdscr.reset_mock()
+
+
+@pytest.mark.parametrize('ascii', [True, False])
+def test_load_screen_initial_delay(terminal, stdscr, ascii):
+    terminal.ascii = ascii
 
     # If we don't reach the initial delay nothing should be drawn
     with terminal.loader(delay=0.1):
         time.sleep(0.05)
-    window.addstr.assert_not_called()
-    window.reset_mock()
+    stdscr.subwin.addstr.assert_not_called()
+
+
+@pytest.mark.parametrize('ascii', [True, False])
+def test_load_screen_nested(terminal, ascii):
+    terminal.ascii = ascii
+
+    with terminal.loader(message='Outer'):
+        with terminal.loader(message='Inner'):
+            raise requests.ConnectionError()
+        assert False  # Should never be reached
+
+    assert isinstance(terminal.loader.exception, requests.ConnectionError)
+    assert terminal.loader.depth == 0
+    assert not terminal.loader._is_running
+    assert not terminal.loader._animator.is_alive()
+
+
+@pytest.mark.parametrize('ascii', [True, False])
+def test_load_screen_nested_complex(terminal, stdscr, ascii):
+    terminal.ascii = ascii
+
+    with terminal.loader(message='Outer') as outer_loader:
+        assert outer_loader.depth == 1
+
+        with terminal.loader(message='Inner') as inner_loader:
+            assert inner_loader.depth == 2
+            assert inner_loader._args[2] == 'Outer'
+
+        with terminal.loader():
+            assert terminal.loader.depth == 2
+            raise requests.ConnectionError()
+
+        assert False  # Should never be reached
+
+    assert isinstance(terminal.loader.exception, requests.ConnectionError)
+    assert terminal.loader.depth == 0
+    assert not terminal.loader._is_running
+    assert not terminal.loader._animator.is_alive()
+    error_message = 'Connection Error'.encode('ascii' if ascii else 'utf-8')
+    stdscr.subwin.addstr.assert_called_once_with(1, 1, error_message)
 
 
 def test_color(stdscr):

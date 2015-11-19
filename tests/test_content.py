@@ -111,12 +111,13 @@ def test_content_submission_from_url(reddit, terminal):
     SubmissionContent.from_url(reddit, url, terminal.loader, order='new')
 
     # Invalid sorting order doesn't raise an exception
-    SubmissionContent.from_url(reddit, url, terminal.loader, order='fake')
+    with terminal.loader():
+        SubmissionContent.from_url(reddit, url, terminal.loader, order='fake')
     assert not terminal.loader.exception
 
     # Invalid comment URL
-    content = SubmissionContent.from_url(reddit, url[:-2], terminal.loader)
-    assert content is None
+    with terminal.loader():
+        SubmissionContent.from_url(reddit, url[:-2], terminal.loader)
     assert isinstance(terminal.loader.exception, praw.errors.NotFound)
     message = 'Not Found'.encode('utf-8')
     terminal.stdscr.derwin().addstr.assert_called_with(1, 1, message)
@@ -134,8 +135,47 @@ def test_content_subreddit_initialize(reddit, terminal):
 def test_content_subreddit_initialize_invalid(reddit, terminal):
 
     submissions = reddit.get_subreddit('invalidsubreddit7').get_top(limit=None)
-    content = SubredditContent('python', submissions, terminal.loader, 'top')
-    assert len(content._submission_data) == 0
+    with terminal.loader():
+        SubredditContent('python', submissions, terminal.loader, 'top')
     assert isinstance(terminal.loader.exception, praw.errors.InvalidSubreddit)
     message = 'Invalid Subreddit'.encode('utf-8')
     terminal.stdscr.subwin.addstr.assert_called_with(1, 1, message)
+
+
+def test_content_subreddit(reddit, terminal):
+
+    submissions = reddit.get_front_page(limit=5)
+    content = SubredditContent('front', submissions, terminal.loader)
+
+    # Submissions are loaded on demand, excluding for the first one
+    assert len(content._submission_data) == 1
+    assert content.get(0)['type'] == 'Submission'
+
+    for data in content.iterate(0, 1):
+        assert all(k in data for k in ('object', 'n_rows', 'offset', 'type',
+                                       'index', 'title', 'split_title'))
+        # All text should be converted to unicode by this point
+        for val in data.values():
+            assert not isinstance(val, six.binary_type)
+
+    # Out of bounds
+    with pytest.raises(IndexError):
+        content.get(-1)
+    with pytest.raises(IndexError):
+        content.get(5)
+
+
+def test_content_subreddit_load_more(reddit, terminal):
+
+    submissions = reddit.get_front_page(limit=None)
+    content = SubredditContent('front', submissions, terminal.loader)
+
+    assert content.get(50)['type'] == 'Submission'
+    assert len(content._submission_data) == 51
+
+    for data in content.iterate(0, 1):
+        assert all(k in data for k in ('object', 'n_rows', 'offset', 'type',
+                                       'index', 'title', 'split_title'))
+        # All text should be converted to unicode by this point
+        for val in data.values():
+            assert not isinstance(val, six.binary_type)

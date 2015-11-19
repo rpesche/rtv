@@ -83,14 +83,30 @@ class LoadScreen(object):
     submission, the user may press ctrl-c to raise a KeyboardInterrupt. In this
     case we would *not* want to refresh the current page.
 
-    Usage:
-        >>> with self.terminal.loader(...) as loader:
-        >>>     # Perform a blocking request to load content
-        >>>     blocking_request(...)
-        >>>
-        >>> if loader.exception is None:
-        >>>     # Only run this if the load was successful
-        >>>     self.refresh_content()
+    >>> with self.terminal.loader(...) as loader:
+    >>>     # Perform a blocking request to load content
+    >>>     blocking_request(...)
+    >>>
+    >>> if loader.exception is None:
+    >>>     # Only run this if the load was successful
+    >>>     self.refresh_content()
+
+    When a loader is nested inside of itself, the outermost loader takes
+    priority and all of the nested loaders become no-ops. Call arguments given
+    to nested loaders will be ignored, and errors will propagate to the parent.
+
+    >>> with self.terminal.loader(...) as loader:
+    >>>
+    >>>     # Additional loaders will be ignored
+    >>>     with self.terminal.loader(...):
+    >>>         raise KeyboardInterrupt()
+    >>>
+    >>>     # This code will not be executed because the inner loader doesn't
+    >>>     # catch the exception
+    >>>     assert False
+    >>>
+    >>> # The exception is finally caught by the outer loader
+    >>> assert isinstance(terminal.loader.exception, KeyboardInterrupt)
     """
 
     HANDLED_EXCEPTIONS = [
@@ -111,6 +127,7 @@ class LoadScreen(object):
     def __init__(self, terminal):
 
         self.exception = None
+        self.depth = 0
         self._terminal = weakref.proxy(terminal)
         self._args = None
         self._animator = None
@@ -129,18 +146,18 @@ class LoadScreen(object):
                 loading screen.
         """
 
-        # Protect against the possibility of nested loaders, e.g.
-        # >>> with loader():
-        # >>>     with loader():
-        # >>>         ...
-        # Doing this results in undefined behavior so it is not allowed
-        assert not self._is_running
+        if self.depth > 0:
+            return self
 
         self.exception = None
         self._args = (delay, interval, message, trail)
         return self
 
     def __enter__(self):
+
+        self.depth += 1
+        if self.depth > 1:
+            return self
 
         self._animator = threading.Thread(target=self.animate, args=self._args)
         self._animator.daemon = True
@@ -149,6 +166,10 @@ class LoadScreen(object):
         return self
 
     def __exit__(self, exc_type, e, exc_tb):
+
+        self.depth -= 1
+        if self.depth > 0:
+            return
 
         self._is_running = False
         self._animator.join()
@@ -167,7 +188,7 @@ class LoadScreen(object):
                         self._terminal.show_notification(message)
                     break
             else:
-                return False  # Re-raise unhandled exceptions
+                return  # Re-raise unhandled exceptions
             return True  # Otherwise swallow the exception and continue
 
     def animate(self, delay, interval, message, trail):

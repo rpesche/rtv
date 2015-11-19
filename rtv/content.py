@@ -22,8 +22,8 @@ class Content(object):
 
         while True:
             if step < 0 and index < 0:
-                # Hack to prevent displaying negative indices if iterating in
-                # the negative direction.
+                # Hack to prevent displaying a submission's post if iterating
+                # comments in the negative direction
                 break
             try:
                 yield self.get(index, n_cols=n_cols)
@@ -238,9 +238,8 @@ class SubmissionContent(Content):
                  order=None):
 
         url = url.replace('http:', 'https:')
-        with loader():
-            submission = reddit.get_submission(url, comment_sort=order)
-            return cls(submission, loader, indent_size, max_indent_level, order)
+        submission = reddit.get_submission(url, comment_sort=order)
+        return cls(submission, loader, indent_size, max_indent_level, order)
 
     def get(self, index, n_cols=70):
         """
@@ -309,6 +308,8 @@ class SubmissionContent(Content):
 
         elif data['type'] == 'MoreComments':
             with self._loader():
+                # Undefined behavior if using a nested loader here
+                assert self._loader.depth == 1
                 comments = data['object'].comments(update=True)
             if not self._loader.exception:
                 comments = self.flatten_comments(comments, data['level'])
@@ -337,11 +338,7 @@ class SubredditContent(Content):
         # This is necessary because PRAW loads submissions lazily, and
         # there is is no other way to check things like multireddits that
         # don't have a real corresponding subreddit object.
-        with self._loader():
-            try:
-                self.get(0)
-            except IndexError:
-                raise praw.errors.InvalidSubreddit()
+        self.get(0)
 
     @classmethod
     def from_name(cls, reddit, name, loader, order=None, query=None):
@@ -410,7 +407,10 @@ class SubredditContent(Content):
 
         while index >= len(self._submission_data):
             try:
-                submission = next(self._submissions)
+                with self._loader():
+                    submission = next(self._submissions)
+                if self._loader.exception:
+                    raise IndexError
             except StopIteration:
                 raise IndexError
             else:
@@ -439,6 +439,8 @@ class SubscriptionContent(Content):
         self._subscriptions = subscriptions
         self._subscription_data = []
 
+        self.get(0)
+
     @classmethod
     def from_user(cls, reddit, loader):
 
@@ -457,7 +459,10 @@ class SubscriptionContent(Content):
 
         while index >= len(self._subscription_data):
             try:
-                subscription = next(self._subscriptions)
+                with self._loader():
+                    subscription = next(self._subscriptions)
+                if self._loader.exception:
+                    raise IndexError
             except StopIteration:
                 raise IndexError
             else:
