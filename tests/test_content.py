@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
+import six
 import time
+import praw
 from itertools import islice
 
 import pytest

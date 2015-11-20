@@ -126,7 +126,7 @@ def stdscr():
 @pytest.yield_fixture()
 def reddit(vcr, request):
 
-    cassette_name = '%s.yaml' % request.module.__name__.split('.')[-1]
+    cassette_name = '%s.yaml' % request.node.name
     with vcr.use_cassette(cassette_name):
         with patch('praw.Reddit.get_access_information'):
             reddit = praw.Reddit(user_agent='rtv test suite',
