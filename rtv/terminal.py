@@ -90,6 +90,10 @@ class Terminal(object):
     @staticmethod
     @contextmanager
     def suspend():
+        """
+        Suspend curses in order to open another subprocess in the terminal.
+        """
+
         try:
             curses.endwin()
             yield
@@ -350,9 +354,10 @@ class Terminal(object):
         if key:
             curses.curs_set(1)
             ch = self.stdscr.getch()
-            # Can't convert ch to unicode because it may be an arbitrary
-            # keyboard code, e.g. F1, that doesn't map through six.unichr
-            text = ch if ch != self.ESCAPE else None
+            # Attempt to convert the keyboard code to a unicode character.
+            # This may return incorrect values for keys that don't map to
+            # unicode characters, e.g. F1.
+            text = six.unichr(ch) if ch != self.ESCAPE else None
             curses.curs_set(0)
         else:
             text = self.text_input(window)

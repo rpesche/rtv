@@ -8,7 +8,7 @@ import six
 import praw
 from kitchen.text.display import wrap
 
-from .exceptions import (SubredditError, AccountError)
+from . import exceptions
 
 
 class Content(object):
@@ -336,7 +336,10 @@ class SubredditContent(Content):
         # This is necessary because PRAW loads submissions lazily, and
         # there is is no other way to check things like multireddits that
         # don't have a real corresponding subreddit object.
-        self.get(0)
+        try:
+            self.get(0)
+        except IndexError:
+            raise exceptions.SubredditError('Unable to retrieve subreddit')
 
     @classmethod
     def from_name(cls, reddit, name, loader, order=None, query=None):
@@ -354,11 +357,11 @@ class SubredditContent(Content):
         display_name = '/r/{}'.format(name)
 
         if order not in ['hot', 'top', 'rising', 'new', 'controversial', None]:
-            raise SubredditError('Unrecognized order "%s"' % order)
+            raise exceptions.SubredditError('Unrecognized order "%s"' % order)
 
         if name == 'me':
             if not reddit.is_oauth_session():
-                raise AccountError('Could not access user account')
+                raise exceptions.AccountError('Could not access user account')
             elif order:
                 submissions = reddit.user.get_submitted(sort=order)
             else:
@@ -437,14 +440,15 @@ class SubscriptionContent(Content):
         self._subscriptions = subscriptions
         self._subscription_data = []
 
-        self.get(0)
+        try:
+            self.get(0)
+        except IndexError:
+            raise exceptions.SubscriptionError('Unable to load subscriptions')
 
     @classmethod
     def from_user(cls, reddit, loader):
-
-        with loader():
-            subscriptions = reddit.get_my_subreddits(limit=None)
-            return cls(subscriptions, loader)
+        subscriptions = reddit.get_my_subreddits(limit=None)
+        return cls(subscriptions, loader)
 
     def get(self, index, n_cols=70):
         """

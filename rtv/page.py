@@ -1,3 +1,6 @@
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals
+
 import sys
 import time
 import curses
@@ -5,9 +8,8 @@ from functools import wraps
 
 from kitchen.text.display import textual_width
 
-from .objects import Controller
-from .terminal import Color
-from .docs import COMMENT_EDIT_FILE, SUBMISSION_FILE, HELP
+from . import docs
+from .objects import Controller, Color
 
 
 def logged_in(f):
@@ -33,6 +35,7 @@ class Page(object):
         self.oauth = oauth
         self.content = None
         self.nav = None
+        self.controller = None
 
         self.active = True
         self._header_window = None
@@ -52,10 +55,11 @@ class Page(object):
         Prompt to exit the application.
         """
 
-        ch = self.term.prompt_input('Do you really want to quit? (y/n): ')
-        if ch == 'y':
+        message = 'Do you really want to quit? (y/n): '
+        ch = self.term.prompt_input(message, key=True)
+        if ch in ('Y', 'y'):
             sys.exit()
-        elif ch != 'n':
+        elif ch in ('N', 'n'):
             self.term.flash()
 
     @Controller.register('Q')
@@ -64,7 +68,7 @@ class Page(object):
 
     @Controller.register('?')
     def show_help(self):
-        self.term.show_notification(HELP.strip().splitlines())
+        self.term.show_notification(docs.HELP.strip().splitlines())
 
     @Controller.register('1')
     def sort_content_hot(self):
@@ -188,10 +192,10 @@ class Page(object):
         if data['type'] == 'Submission':
             subreddit = self.reddit.get_subreddit(self.content.name)
             content = data['text']
-            info = SUBMISSION_FILE.format(content=content, name=subreddit)
+            info = docs.SUBMISSION_FILE.format(content=content, name=subreddit)
         elif data['type'] == 'Comment':
             content = data['body']
-            info = COMMENT_EDIT_FILE.format(content=content)
+            info = docs.COMMENT_EDIT_FILE.format(content=content)
         else:
             self.term.flash()
             return

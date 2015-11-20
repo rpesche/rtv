@@ -110,13 +110,15 @@ class LoadScreen(object):
     """
 
     HANDLED_EXCEPTIONS = [
-        (exceptions.AccountError, 'Could Not Access Account')
-        (exceptions.SubmissionError, 'Invalid Subreddit'),
+        (exceptions.SubscriptionError, 'No Subscriptions'),
+        (exceptions.AccountError, 'Unable to Access Account'),
+        (exceptions.SubredditError, 'Invalid Subreddit'),
         (praw.errors.InvalidSubreddit, 'Invalid Subreddit'),
         (praw.errors.InvalidComment, 'Invalid Comment'),
         (praw.errors.InvalidSubmission, 'Invalid Submission'),
         (praw.errors.OAuthAppRequired, 'Invalid OAuth data'),
         (praw.errors.OAuthException, 'Invalid OAuth data'),
+        (praw.errors.LoginOrScopeRequired, 'Not Logged In'),
         (praw.errors.ClientException, 'Reddit Client Error'),
         (praw.errors.NotFound, 'Not Found'),
         (praw.errors.APIException, 'Reddit API Error'),

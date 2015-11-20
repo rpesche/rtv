@@ -3,7 +3,6 @@ from __future__ import unicode_literals
 
 import time
 import uuid
-from functools import wraps
 
 from tornado import gen, ioloop, web, httpserver
 from concurrent.futures import ThreadPoolExecutor
