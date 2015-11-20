@@ -110,6 +110,8 @@ class LoadScreen(object):
     """
 
     HANDLED_EXCEPTIONS = [
+        (exceptions.AccountError, 'Could Not Access Account')
+        (exceptions.SubmissionError, 'Invalid Subreddit'),
         (praw.errors.InvalidSubreddit, 'Invalid Subreddit'),
         (praw.errors.InvalidComment, 'Invalid Comment'),
         (praw.errors.InvalidSubmission, 'Invalid Submission'),

@@ -10,6 +10,7 @@ import pytest
 
 from rtv.content import (
     Content, SubmissionContent, SubredditContent, SubscriptionContent)
+from rtv import exceptions
 
 try:
     from unittest import mock
@@ -182,3 +183,39 @@ def test_content_subreddit_load_more(reddit, terminal):
         # All text should be converted to unicode by this point
         for val in data.values():
             assert not isinstance(val, six.binary_type)
+
+
+def test_content_subreddit_from_name(reddit, terminal):
+
+    name = '/r/python'
+    content = SubredditContent.from_name(reddit, name, terminal.loader)
+    assert content.name == '/r/python'
+    assert content.order is None
+
+    # Can submit without the /r/
+    name = 'python'
+    content = SubredditContent.from_name(reddit, name, terminal.loader)
+    assert content.name == '/r/python'
+    assert content.order is None
+
+    # Can submit with the order in the name
+    name = '/r/python/top'
+    content = SubredditContent.from_name(reddit, name, terminal.loader)
+    assert content.name == '/r/python'
+    assert content.order == 'top'
+
+    # Explicit order trumps implicit
+    name = '/r/python/top'
+    content = SubredditContent.from_name(reddit, name, terminal.loader,
+                                         order='new')
+    assert content.name == '/r/python'
+    assert content.order == 'new'
+
+    # Invalid order raises an exception
+    name = '/r/python/fake'
+    with terminal.loader():
+        SubredditContent.from_name(reddit, name, terminal.loader)
+    assert isinstance(terminal.loader.exception, exceptions.SubredditError)
+    message = 'Invalid Subreddit'.encode('utf-8')
+    terminal.stdscr.subwin.addstr.assert_called_with(1, 1, message)
+    
