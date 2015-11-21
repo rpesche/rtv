@@ -1,34 +1,25 @@
 import curses
 
-from .page import Page
+from .page import Page, PageController
 from .content import SubscriptionContent
-from .objects import Navigator, Controller
+from .objects import Navigator
 from .terminal import Color
 
 
-class SubscriptionController(Controller):
+class SubscriptionController(PageController):
     character_map = {}
 
 
 class SubscriptionPage(Page):
 
-    def __init__(self, stdscr, reddit, config, oauth):
+    def __init__(self, reddit, term, config, oauth):
 
-        super(SubscriptionPage, self).__init__(stdscr, reddit, config, oauth)
+        super(SubscriptionPage, self).__init__(reddit, term, config, oauth)
 
-        self.content = SubscriptionContent.from_user(reddit, self.loader)
+        self.content = SubscriptionContent.from_user(reddit, term.loader)
         self.controller = SubscriptionController(self)
         self.nav = Navigator(self.content.get)
         self.subreddit_data = None
-
-    def loop(self):
-        "Main control loop"
-
-        self.active = True
-        while self.active:
-            self.draw()
-            cmd = self.stdscr.getch()
-            self.controller.trigger(cmd)
 
     @SubscriptionController.register(curses.KEY_F5, 'r')
     def refresh_content(self, order=None):
@@ -36,14 +27,15 @@ class SubscriptionPage(Page):
 
         # reddit.get_my_subreddits() does not support sorting by order
         if order:
-            curses.flash()
+            self.term.flash()
             return
 
-        self.content = SubscriptionContent.from_user(self.reddit, self.loader)
+        self.content = SubscriptionContent.from_user(self.reddit,
+                                                     self.term.loader)
         self.nav = Navigator(self.content.get)
 
     @SubscriptionController.register(curses.KEY_ENTER, 10, curses.KEY_RIGHT)
-    def store_selected_subreddit(self):
+    def select_subreddit(self):
         "Store the selected subreddit and return to the subreddit page"
 
         self.subreddit_data = self.content.get(self.nav.absolute_index)

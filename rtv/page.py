@@ -25,6 +25,10 @@ def logged_in(f):
     return wrapped_method
 
 
+class PageController(Controller):
+    character_map = {}
+
+
 class Page(object):
 
     def __init__(self, reddit, term, config, oauth):
@@ -49,68 +53,77 @@ class Page(object):
     def draw_item(window, data, inverted):
         raise NotImplementedError
 
-    @Controller.register('q')
+    def loop(self):
+        """
+        Main control loop runs the following steps:
+            1. Re-draw the screen
+            2. Wait for user to press a key (includes terminal resizing)
+            3. Trigger the method registered to the input key
+
+        The loop will run until self.active is set to False from within one of
+        the methods.
+        """
+
+        self.active = True
+        while self.active:
+            self.draw()
+            ch = self.term.stdscr.getch()
+            self.controller.trigger(ch)
+
+    @PageController.register('q')
     def exit(self):
-        """
-        Prompt to exit the application.
-        """
-
-        message = 'Do you really want to quit? (y/n): '
-        ch = self.term.prompt_input(message, key=True)
-        if ch in ('Y', 'y'):
+        if self.term.prompt_y_or_n('Do you really want to quit? (y/n): '):
             sys.exit()
-        elif ch in ('N', 'n'):
-            self.term.flash()
 
-    @Controller.register('Q')
+    @PageController.register('Q')
     def force_exit(self):
         sys.exit()
 
-    @Controller.register('?')
+    @PageController.register('?')
     def show_help(self):
         self.term.show_notification(docs.HELP.strip().splitlines())
 
-    @Controller.register('1')
+    @PageController.register('1')
     def sort_content_hot(self):
         self.refresh_content(order='hot')
 
-    @Controller.register('2')
+    @PageController.register('2')
     def sort_content_top(self):
         self.refresh_content(order='top')
 
-    @Controller.register('3')
+    @PageController.register('3')
     def sort_content_rising(self):
         self.refresh_content(order='rising')
 
-    @Controller.register('4')
+    @PageController.register('4')
     def sort_content_new(self):
         self.refresh_content(order='new')
 
-    @Controller.register('5')
+    @PageController.register('5')
     def sort_content_controversial(self):
         self.refresh_content(order='controversial')
 
-    @Controller.register(curses.KEY_UP, 'k')
+    @PageController.register(curses.KEY_UP, 'k')
     def move_cursor_up(self):
         self._move_cursor(-1)
         self.clear_input_queue()
 
-    @Controller.register(curses.KEY_DOWN, 'j')
+    @PageController.register(curses.KEY_DOWN, 'j')
     def move_cursor_down(self):
         self._move_cursor(1)
         self.clear_input_queue()
 
-    @Controller.register('n', curses.KEY_NPAGE)
-    def move_page_down(self):
-        self._move_page(1)
-        self.clear_input_queue()
-
-    @Controller.register('m', curses.KEY_PPAGE)
+    @PageController.register('m', curses.KEY_PPAGE)
     def move_page_up(self):
         self._move_page(-1)
         self.clear_input_queue()
 
-    @Controller.register('a')
+    @PageController.register('n', curses.KEY_NPAGE)
+    def move_page_down(self):
+        self._move_page(1)
+        self.clear_input_queue()
+
+    @PageController.register('a')
     @logged_in
     def upvote(self):
         data = self.content.get(self.nav.absolute_index)
@@ -123,7 +136,7 @@ class Page(object):
             data['object'].upvote()
             data['likes'] = True
 
-    @Controller.register('z')
+    @PageController.register('z')
     @logged_in
     def downvote(self):
         data = self.content.get(self.nav.absolute_index)
@@ -136,7 +149,7 @@ class Page(object):
             data['object'].clear_vote()
             data['likes'] = None
 
-    @Controller.register('u')
+    @PageController.register('u')
     def login(self):
         """
         Prompt to log into the user's account, or log out of the current
@@ -144,16 +157,13 @@ class Page(object):
         """
 
         if self.reddit.is_oauth_session():
-            ch = self.term.prompt_input('Log out? (y/n): ')
-            if ch == 'y':
+            if self.term.prompt_y_or_n('Log out? (y/n): '):
                 self.oauth.clear_oauth_data()
                 self.term.show_notification('Logged out')
-            elif ch != 'n':
-                self.term.flash()
         else:
             self.oauth.authorize()
 
-    @Controller.register('d')
+    @PageController.register('d')
     @logged_in
     def delete(self):
         """
@@ -177,7 +187,7 @@ class Page(object):
         if self.term.loader.exception is None:
             self.refresh_content()
 
-    @Controller.register('e')
+    @PageController.register('e')
     @logged_in
     def edit(self):
         """
@@ -211,7 +221,7 @@ class Page(object):
         if self.term.loader.exception is None:
             self.refresh_content()
 
-    @Controller.register('i')
+    @PageController.register('i')
     @logged_in
     def get_inbox(self):
         """

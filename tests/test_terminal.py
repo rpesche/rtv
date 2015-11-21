@@ -183,16 +183,16 @@ def test_text_input(terminal, stdscr, ascii):
 
     # Text will be wrong because stdscr.inch() is not implemented
     # But we can at least tell if text was captured or not
-    stdscr.getch.side_effect = ['h', 'i', '!', terminal.RETURN]
+    stdscr.getch.side_effect = [ord('h'), ord('i'), ord('!'), terminal.RETURN]
     assert isinstance(terminal.text_input(stdscr), six.text_type)
 
-    stdscr.getch.side_effect = ['b', 'y', 'e', terminal.ESCAPE]
+    stdscr.getch.side_effect = [ord('b'), ord('y'), ord('e'), terminal.ESCAPE]
     assert terminal.text_input(stdscr) is None
 
-    stdscr.getch.side_effect = ['h', curses.KEY_RESIZE, terminal.RETURN]
+    stdscr.getch.side_effect = [ord('h'), curses.KEY_RESIZE, terminal.RETURN]
     assert terminal.text_input(stdscr, allow_resize=True) is not None
 
-    stdscr.getch.side_effect = ['h', curses.KEY_RESIZE, terminal.RETURN]
+    stdscr.getch.side_effect = [ord('h'), curses.KEY_RESIZE, terminal.RETURN]
     assert terminal.text_input(stdscr, allow_resize=False) is None
 
 
@@ -202,7 +202,7 @@ def test_prompt_input(terminal, stdscr, ascii):
     terminal.ascii = ascii
     window = stdscr.derwin()
 
-    window.getch.side_effect = ['h', 'e', 'l', 'l', 'o', terminal.RETURN]
+    window.getch.side_effect = [ord('h'), ord('i'), terminal.RETURN]
     assert isinstance(terminal.prompt_input('hi'), six.text_type)
 
     attr = Color.CYAN | curses.A_BOLD
@@ -210,14 +210,40 @@ def test_prompt_input(terminal, stdscr, ascii):
     assert window.nlines == 1
     assert window.ncols == 78
 
-    window.getch.side_effect = ['b', 'y', 'e', terminal.ESCAPE]
+    window.getch.side_effect = [ord('b'), ord('y'), ord('e'), terminal.ESCAPE]
     assert terminal.prompt_input('hi') is None
 
-    stdscr.getch.side_effect = ['b', 'e', 'l', 'l', 'o', terminal.RETURN]
-    assert terminal.prompt_input('hi', key=True) == 'b'
+    stdscr.getch.side_effect = [ord('b'), ord('e'), terminal.RETURN]
+    assert terminal.prompt_input('hi', key=True) == ord('b')
 
-    stdscr.getch.side_effect = [terminal.ESCAPE, 'e', 'l', 'l', 'o']
+    stdscr.getch.side_effect = [terminal.ESCAPE, ord('e'), ord('l')]
     assert terminal.prompt_input('hi', key=True) is None
+
+
+def test_prompt_y_or_n(terminal, stdscr):
+
+    stdscr.getch.side_effect = [ord('y'), ord('N'), terminal.ESCAPE, ord('a')]
+    attr = Color.CYAN | curses.A_BOLD
+
+    # Press 'y'
+    assert terminal.prompt_y_or_n('hi')
+    stdscr.addstr.assert_called_with(39, 0, 'hi'.encode('ascii'), attr)
+    assert not curses.flash.called
+
+    # Press 'N'
+    assert not terminal.prompt_y_or_n('hi')
+    stdscr.addstr.assert_called_with(39, 0, 'hi'.encode('ascii'), attr)
+    assert not curses.flash.called
+
+    # Press Esc
+    assert not terminal.prompt_y_or_n('hi')
+    stdscr.addstr.assert_called_with(39, 0, 'hi'.encode('ascii'), attr)
+    assert not curses.flash.called
+
+    # Press an invalid key
+    assert not terminal.prompt_y_or_n('hi')
+    stdscr.addstr.assert_called_with(39, 0, 'hi'.encode('ascii'), attr)
+    assert curses.flash.called
 
 
 def test_open_editor(terminal):
@@ -240,6 +266,7 @@ def test_open_editor(terminal):
         assert not os.path.isfile(data['filename'])
         assert curses.endwin.called
         assert curses.doupdate.called
+
 
 def test_open_browser(terminal):
 

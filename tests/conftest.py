@@ -81,7 +81,7 @@ def vcr(request):
         record_mode=request.config.option.record_mode,
         filter_headers=[('Authorization', '**********')],
         filter_post_data_parameters=[('refresh_token', '**********')],
-        match_on=['uri', 'method', 'body', 'refresh_token'],
+        match_on=['uri', 'method', 'refresh_token', 'body'],
         cassette_library_dir=cassette_dir)
     vcr.register_matcher('refresh_token', matcher)
     return vcr
@@ -130,7 +130,8 @@ def reddit(vcr, request):
     with vcr.use_cassette(cassette_name):
         with patch('praw.Reddit.get_access_information'):
             reddit = praw.Reddit(user_agent='rtv test suite',
-                                 decode_html_entities=False)
+                                 decode_html_entities=False,
+                                 disable_update_check=True)
             if request.config.option.record_mode == 'none':
                 reddit.config.api_request_delay = 0
             yield reddit

@@ -7,7 +7,7 @@ import curses
 import pytest
 import requests
 
-from rtv.objects import Color, LoadScreen, Controller, Navigator, curses_session
+from rtv.objects import Color, Controller, Navigator, curses_session
 
 
 @pytest.mark.parametrize('ascii', [True, False])

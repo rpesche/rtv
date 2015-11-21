@@ -3,7 +3,7 @@ from __future__ import unicode_literals
 
 import pytest
 
-from rtv.page import Page, Controller, logged_in
+from rtv.page import Page, PageController, logged_in
 
 try:
     from unittest import mock
@@ -34,13 +34,19 @@ def test_logged_in(terminal):
     terminal.stdscr.subwin.addstr.assert_called_with(1, 1, message)
 
 
-def test_page_unauthenticated(reddit, terminal, config, oauth):
+def test_page_unauthenticated(reddit, terminal, config, oauth, stdscr):
 
     page = Page(reddit, terminal, config, oauth)
     page.content = mock.MagicMock()
     page.nav = mock.MagicMock()
-    page.controller = Controller(page)
+    page.controller = PageController(page)
     page.refresh_content = mock.MagicMock()
+
+    # Loop
+    def func():
+        page.active = False
+    page.controller.trigger = mock.Mock(side_effect=func)
+    page.loop()
 
     # Quit, confirm
     terminal.stdscr.getch.return_value = ord('y')
@@ -76,3 +82,41 @@ def test_page_unauthenticated(reddit, terminal, config, oauth):
     page.refresh_content.assert_called_with(order='new')
     page.controller.trigger('5')
     page.refresh_content.assert_called_with(order='controversial')
+
+    logged_in_methods = [
+        'a',  # Upvote
+        'z',  # Downvote
+        'd',  # Delete
+        'e',  # Edit
+        'i',  # Get inbox
+    ]
+    for ch in logged_in_methods:
+        page.controller.trigger(ch)
+        message = 'Not logged in'.encode('utf-8')
+        terminal.stdscr.subwin.addstr.assert_called_with(1, 1, message)
+        terminal.stdscr.subwin.addstr.reset_mock()
+
+
+def test_page_authenticated(reddit, terminal, config, oauth, refresh_token):
+
+    page = Page(reddit, terminal, config, oauth)
+    page.controller = PageController(page)
+    config.refresh_token = refresh_token
+
+    # Login
+    page.controller.trigger('u')
+    assert reddit.is_oauth_session()
+
+    # Get inbox - Call the real method
+    page.controller.trigger('i')
+
+    # Get inbox - Simulate no new messages
+    reddit.get_unread = mock.Mock(return_value=[])
+    page.controller.trigger('i')
+    message = 'No New Messages'.encode('utf-8')
+    terminal.stdscr.subwin.addstr.assert_called_with(1, 1, message)
+
+    # Logout
+    terminal.stdscr.getch.return_value = ord('y')
+    page.controller.trigger('u')
+    assert not reddit.is_oauth_session()

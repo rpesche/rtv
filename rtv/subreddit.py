@@ -5,8 +5,8 @@ import six
 import requests
 
 from .exceptions import SubredditError, AccountError
-from .page import Page, logged_in
-from .objects import Navigator, Controller
+from .page import Page, PageController, logged_in
+from .objects import Navigator
 from .submission import SubmissionPage
 from .subscription import SubscriptionPage
 from .content import SubredditContent
@@ -14,7 +14,7 @@ from .terminal import Color
 from .docs import SUBMISSION_FILE
 
 
-class SubredditController(Controller):
+class SubredditController(PageController):
     character_map = {}
 
 
@@ -35,15 +35,6 @@ class SubredditPage(Page):
 
         if url:
             self.open_submission(url=url)
-
-    def loop(self):
-        "Main control loop"
-
-        self.active = True
-        while self.active:
-            self.draw()
-            cmd = self.stdscr.getch()
-            self.controller.trigger(cmd)
 
     @SubredditController.register(curses.KEY_F5, 'r')
     def refresh_content(self, name=None, order=None):

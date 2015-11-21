@@ -33,15 +33,6 @@ class SubmissionPage(Page):
         self.controller = SubmissionController(self)
         self.nav = Navigator(self.content.get, page_index=-1)
 
-    def loop(self):
-        "Main control loop"
-
-        self.active = True
-        while self.active:
-            self.draw()
-            cmd = self.stdscr.getch()
-            self.controller.trigger(cmd)
-
     @SubmissionController.register(curses.KEY_RIGHT, 'l', ' ')
     def toggle_comment(self):
         "Toggle the selected comment tree between visible and hidden"

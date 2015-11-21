@@ -354,14 +354,28 @@ class Terminal(object):
         if key:
             curses.curs_set(1)
             ch = self.stdscr.getch()
-            # Attempt to convert the keyboard code to a unicode character.
-            # This may return incorrect values for keys that don't map to
-            # unicode characters, e.g. F1.
-            text = six.unichr(ch) if ch != self.ESCAPE else None
+            # We can't convert the character to unicode, because it may return
+            # Invalid values for keys that don't map to unicode characters,
+            # e.g. F1
+            text = ch if ch != self.ESCAPE else None
             curses.curs_set(0)
         else:
             text = self.text_input(window)
         return text
+
+    def prompt_y_or_n(self, prompt):
+        """
+        Wrapper around prompt_input for simple yes/no queries.
+        """
+
+        ch = self.prompt_input(prompt, key=True)
+        if ch in (ord('Y'), ord('y')):
+            return True
+        elif ch in (ord('N'), ord('n'), None):
+            return False
+        else:
+            self.flash()
+            return False
 
     @staticmethod
     def strip_textpad(text):
