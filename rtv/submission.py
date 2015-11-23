@@ -5,7 +5,7 @@ import curses
 from .content import SubmissionContent
 from .page import Page, logged_in
 from .objects import Navigator, Controller
-from .terminal import Color
+from .terminal import Terminal
 from .docs import COMMENT_FILE
 
 
@@ -60,7 +60,7 @@ class SubmissionPage(Page):
             self.reddit, self.content.name, self.loader, order=order)
         self.nav = Navigator(self.content.get, page_index=-1)
 
-    @SubmissionController.register(curses.KEY_ENTER, 10, 'o')
+    @SubmissionController.register(curses.KEY_ENTER, Terminal.RETURN, 'o')
     def open_link(self):
         "Open the current submission page with the webbrowser"
 

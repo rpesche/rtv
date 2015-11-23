@@ -128,7 +128,7 @@ class Page(object):
     def upvote(self):
         data = self.content.get(self.nav.absolute_index)
         if 'likes' not in data:
-            pass
+            self.term.flash()
         elif data['likes']:
             data['object'].clear_vote()
             data['likes'] = None
@@ -141,7 +141,7 @@ class Page(object):
     def downvote(self):
         data = self.content.get(self.nav.absolute_index)
         if 'likes' not in data:
-            pass
+            self.term.flash()
         elif data['likes'] or data['likes'] is None:
             data['object'].downvote()
             data['likes'] = False
@@ -247,6 +247,8 @@ class Page(object):
         window = self.term.stdscr
         n_rows, n_cols = window.getmaxyx()
         if n_rows < self.term.MIN_HEIGHT or n_cols < self.term.MIN_WIDTH:
+            # TODO: Will crash when you try to navigate if the terminal is too
+            # small at startup because self._subwindows will never be populated
             return
 
         # Note: 2 argument form of derwin breaks PDcurses on Windows 7!
@@ -273,10 +275,14 @@ class Page(object):
             self.term.add_line(self._header_window, order)
 
         if self.reddit.user is not None:
+            # The starting position of the name depends on if we're converting
+            # to ascii or not
+            width = len if self.config['ascii'] else textual_width
+
             username = self.reddit.user.name
-            s_col = (n_cols - textual_width(username) - 1)
+            s_col = (n_cols - width(username) - 1)
             # Only print username if it fits in the empty space on the right
-            if (s_col - 1) >= textual_width(sub_name):
+            if (s_col - 1) >= width(sub_name):
                 self.term.add_line(self._header_window, username, 0, s_col)
 
         self._header_window.refresh()
@@ -350,7 +356,7 @@ class Page(object):
         self._draw_content()
         self._add_cursor()
 
-    def _edit_cursor(self, attribute=None):
+    def _edit_cursor(self, attribute):
 
         # Don't allow the cursor to go below page index 0
         if self.nav.absolute_index < 0:
@@ -360,7 +366,7 @@ class Page(object):
         # This could happen if the window is resized and the cursor index is
         # pushed out of bounds
         if self.nav.cursor_index >= len(self._subwindows):
-            self.nav.cursor_index = len(self._subwindows)-1
+            self.nav.cursor_index = len(self._subwindows) - 1
 
         window, attr = self._subwindows[self.nav.cursor_index]
         if attr is not None:

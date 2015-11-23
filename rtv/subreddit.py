@@ -10,7 +10,7 @@ from .objects import Navigator
 from .submission import SubmissionPage
 from .subscription import SubscriptionPage
 from .content import SubredditContent
-from .terminal import Color
+from .terminal import Terminal
 from .docs import SUBMISSION_FILE
 
 
@@ -103,7 +103,7 @@ class SubredditPage(Page):
         if url_type == 'selfpost':
             self.config.history.add(url)
 
-    @SubredditController.register(curses.KEY_ENTER, 10, 'o')
+    @SubredditController.register(curses.KEY_ENTER, Terminal.RETURN, 'o')
     def open_link(self):
         "Open a link with the webbrowser"
 

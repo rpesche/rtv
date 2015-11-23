@@ -2,8 +2,8 @@ import curses
 
 from .page import Page, PageController
 from .content import SubscriptionContent
-from .objects import Navigator
-from .terminal import Color
+from .objects import Color, Navigator
+from .terminal import Terminal
 
 
 class SubscriptionController(PageController):
@@ -34,14 +34,15 @@ class SubscriptionPage(Page):
                                                      self.term.loader)
         self.nav = Navigator(self.content.get)
 
-    @SubscriptionController.register(curses.KEY_ENTER, 10, curses.KEY_RIGHT)
+    @SubscriptionController.register(curses.KEY_ENTER, Terminal.RETURN,
+                                     curses.KEY_RIGHT, 'l')
     def select_subreddit(self):
         "Store the selected subreddit and return to the subreddit page"
 
         self.subreddit_data = self.content.get(self.nav.absolute_index)
         self.active = False
 
-    @SubscriptionController.register(curses.KEY_LEFT, 'h', 's')
+    @SubscriptionController.register(curses.KEY_LEFT, Terminal.ESCAPE, 'h', 's')
     def close_subscriptions(self):
         "Close subscriptions and return to the subreddit page"
 
@@ -58,9 +59,9 @@ class SubscriptionPage(Page):
         row = offset
         if row in valid_rows:
             attr = curses.A_BOLD | Color.YELLOW
-            self.add_line(win, u'{name}'.format(**data), row, 1, attr)
+            self.term.add_line(win, u'{name}'.format(**data), row, 1, attr)
 
         row = offset + 1
         for row, text in enumerate(data['split_title'], start=row):
             if row in valid_rows:
-                self.add_line(win, text, row, 1)
+                self.term.add_line(win, text, row, 1)
