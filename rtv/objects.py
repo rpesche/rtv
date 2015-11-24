@@ -510,6 +510,9 @@ class Controller(object):
             if func:
                 break
             func = controller.character_map.get(None)
+
+        func_name = func.__name__ if func else None
+        _logger.debug('Key pressed: {0} - {1}'.format(char, func_name))
         return func(self.instance, *args, **kwargs) if func else None
 
     @classmethod

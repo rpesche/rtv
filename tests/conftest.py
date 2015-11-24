@@ -22,10 +22,10 @@ except ImportError:
 # Turn on autospec by default for convenience
 patch = partial(mock.patch, autospec=True)
 
+# Turn on logging, but disable vcr from spamming
 logging.basicConfig(level=logging.DEBUG)
-logging.getLogger('vcr.stubs').disabled = True
-logging.getLogger('vcr.matchers').disabled = True
-logging.getLogger('vcr.cassette').disabled = True
+for name in ['vcr.stubs', 'vcr.matchers', 'vcr.cassette']:
+    logging.getLogger(name).disabled = True
 
 
 def pytest_addoption(parser):
@@ -81,8 +81,19 @@ def vcr(request):
         return (r1.headers.get('authorization') ==
                 r2.headers.get('authorization'))
 
-    # https://github.com/kevin1024/vcrpy/pull/196
+    # Use `none` to use the recorded requests, and `once` to delete existing
+    # cassettes and re-record.
+    record_mode = request.config.option.record_mode
+    assert record_mode in ('once', 'none')
+
+    # Erase the cassettes before each run
     cassette_dir = os.path.join(os.path.dirname(__file__), 'cassettes')
+    if record_mode == 'once':
+        for filename in os.listdir(cassette_dir):
+            if filename.endswith('.yaml'):
+                os.remove(os.path.join(cassette_dir, filename))
+
+    # https://github.com/kevin1024/vcrpy/pull/196
     vcr = VCR(
         record_mode=request.config.option.record_mode,
         filter_headers=[('Authorization', '**********')],

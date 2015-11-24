@@ -33,10 +33,6 @@ def test_subscription_page_draw(reddit, terminal, config, oauth, refresh_token):
     name = reddit.user.name.encode('utf-8')
     window.addstr.assert_any_call(0, 59, name)
 
-    # Subscription item
-    name = '/r/programming'.encode('utf-8')
-    window.subwin.addstr.assert_any_call(0, 1, name, 2097152)
-
     # Cursor - 2 lines
     window.subwin.chgat.assert_any_call(0, 0, 1, 262144)
     window.subwin.chgat.assert_any_call(1, 0, 1, 262144)
@@ -99,9 +95,18 @@ def test_subscription_page(reddit, terminal, config, oauth, refresh_token):
     assert page.nav.absolute_index == 0
     assert not page.nav.inverted
 
-    # Page down
+    # All subscriptions should have been loaded, including this one
+    window = terminal.stdscr.subwin.subwin
+    name = 'Python'.encode('utf-8')
+    window.addstr.assert_any_call(1, 1, name)
+
+    # Page down should move the last item to the top
+    n = len(page._subwindows)
     page.controller.trigger('n')
-    pass
+    assert page.nav.absolute_index == n - 1
+
+    # And page up should move back up, but possibly not to the first item
+    page.controller.trigger('m')
 
     # Select a subreddit
     page.controller.trigger(curses.KEY_ENTER)

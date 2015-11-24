@@ -86,8 +86,6 @@ def test_authorize(oauth, reddit, stdscr, refresh_token):
         oauth.config.refresh_token = None
         uuid.return_value = 'invalidcode'
         oauth.authorize()
-        message = 'Redirecting to reddit'.encode('utf-8')
-        stdscr.subwin.addstr.assert_any_call(1, 1, message)
         error_message = 'UUID mismatch'.encode('utf-8')
         stdscr.subwin.addstr.assert_any_call(1, 1, error_message)
 
