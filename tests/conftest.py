@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
+import os
 import curses
+import logging
 from functools import partial
 
-import os
 import praw
 import pytest
 from vcr import VCR
@@ -20,6 +21,11 @@ except ImportError:
 
 # Turn on autospec by default for convenience
 patch = partial(mock.patch, autospec=True)
+
+logging.basicConfig(level=logging.DEBUG)
+logging.getLogger('vcr.stubs').disabled = True
+logging.getLogger('vcr.matchers').disabled = True
+logging.getLogger('vcr.cassette').disabled = True
 
 
 def pytest_addoption(parser):

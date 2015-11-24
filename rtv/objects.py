@@ -182,9 +182,7 @@ class LoadScreen(object):
         if e is not None:
             # Log the exception and attach it so the caller can inspect it
             self.exception = e
-            if not isinstance(e, KeyboardInterrupt):
-                _logger.exception(e)
-
+            _logger.info('Loader caught: {0} - {1}'.format(type(e).__name__, e))
             # If an error occurred, display a notification on the screen
             for base, message in self.HANDLED_EXCEPTIONS:
                 if isinstance(e, base):

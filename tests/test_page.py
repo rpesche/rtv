@@ -34,67 +34,70 @@ def test_logged_in(terminal):
     terminal.stdscr.subwin.addstr.assert_called_with(1, 1, message)
 
 
-def test_page_unauthenticated(reddit, terminal, config, oauth, stdscr):
+def test_page_unauthenticated(reddit, terminal, config, oauth):
 
     page = Page(reddit, terminal, config, oauth)
-    page.content = mock.MagicMock()
-    page.nav = mock.MagicMock()
     page.controller = PageController(page)
-    page.refresh_content = mock.MagicMock()
+    with mock.patch.object(page, 'refresh_content'), \
+            mock.patch.object(page, 'content'),      \
+            mock.patch.object(page, 'nav'),          \
+            mock.patch.object(page, 'draw'):
 
-    # Loop
-    def func():
-        page.active = False
-    page.controller.trigger = mock.Mock(side_effect=func)
-    page.loop()
+        # Loop
+        def func(ch):
+            page.active = False
+        with mock.patch.object(page, 'controller'):
+            page.controller.trigger = mock.MagicMock(side_effect=func)
+            page.loop()
+        assert page.draw.called
 
-    # Quit, confirm
-    terminal.stdscr.getch.return_value = ord('y')
-    with mock.patch('sys.exit') as sys_exit:
-        page.controller.trigger('q')
-    assert sys_exit.called
+        # Quit, confirm
+        terminal.stdscr.getch.return_value = ord('y')
+        with mock.patch('sys.exit') as sys_exit:
+            page.controller.trigger('q')
+        assert sys_exit.called
 
-    # Quit, deny
-    terminal.stdscr.getch.return_value = terminal.ESCAPE
-    with mock.patch('sys.exit') as sys_exit:
-        page.controller.trigger('q')
-    assert not sys_exit.called
+        # Quit, deny
+        terminal.stdscr.getch.return_value = terminal.ESCAPE
+        with mock.patch('sys.exit') as sys_exit:
+            page.controller.trigger('q')
+        assert not sys_exit.called
 
-    # Force quit
-    terminal.stdscr.getch.return_value = terminal.ESCAPE
-    with mock.patch('sys.exit') as sys_exit:
-        page.controller.trigger('Q')
-    assert sys_exit.called
+        # Force quit
+        terminal.stdscr.getch.return_value = terminal.ESCAPE
+        with mock.patch('sys.exit') as sys_exit:
+            page.controller.trigger('Q')
+        assert sys_exit.called
 
-    # Show help
-    page.controller.trigger('?')
-    message = 'Basic Commands'.encode('utf-8')
-    terminal.stdscr.subwin.addstr.assert_any_call(1, 1, message)
+        # Show help
+        page.controller.trigger('?')
+        message = 'Basic Commands'.encode('utf-8')
+        terminal.stdscr.subwin.addstr.assert_any_call(1, 1, message)
 
-    # Sort content
-    page.controller.trigger('1')
-    page.refresh_content.assert_called_with(order='hot')
-    page.controller.trigger('2')
-    page.refresh_content.assert_called_with(order='top')
-    page.controller.trigger('3')
-    page.refresh_content.assert_called_with(order='rising')
-    page.controller.trigger('4')
-    page.refresh_content.assert_called_with(order='new')
-    page.controller.trigger('5')
-    page.refresh_content.assert_called_with(order='controversial')
+        # Sort content
+        page.controller.trigger('1')
+        page.refresh_content.assert_called_with(order='hot')
+        page.controller.trigger('2')
+        page.refresh_content.assert_called_with(order='top')
+        page.controller.trigger('3')
+        page.refresh_content.assert_called_with(order='rising')
+        page.controller.trigger('4')
+        page.refresh_content.assert_called_with(order='new')
+        page.controller.trigger('5')
+        page.refresh_content.assert_called_with(order='controversial')
 
-    logged_in_methods = [
-        'a',  # Upvote
-        'z',  # Downvote
-        'd',  # Delete
-        'e',  # Edit
-        'i',  # Get inbox
-    ]
-    for ch in logged_in_methods:
-        page.controller.trigger(ch)
-        message = 'Not logged in'.encode('utf-8')
-        terminal.stdscr.subwin.addstr.assert_called_with(1, 1, message)
-        terminal.stdscr.subwin.addstr.reset_mock()
+        logged_in_methods = [
+            'a',  # Upvote
+            'z',  # Downvote
+            'd',  # Delete
+            'e',  # Edit
+            'i',  # Get inbox
+        ]
+        for ch in logged_in_methods:
+            page.controller.trigger(ch)
+            message = 'Not logged in'.encode('utf-8')
+            terminal.stdscr.subwin.addstr.assert_called_with(1, 1, message)
+            terminal.stdscr.subwin.addstr.reset_mock()
 
 
 def test_page_authenticated(reddit, terminal, config, oauth, refresh_token):

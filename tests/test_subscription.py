@@ -83,13 +83,21 @@ def test_subscription_page(reddit, terminal, config, oauth, refresh_token):
     while not curses.flash.called:
         page.controller.trigger('j')
     curses.flash.reset_mock()
-    assert page.nav.absolute_index == 12
+    assert page.nav.absolute_index == 52  # 52 total subscriptions
+    assert page.nav.inverted
 
     # And back to the top
-    for i in range(len(page._subwindows)):
+    for i in range(page.nav.absolute_index):
         page.controller.trigger('k')
+    assert not curses.flash.called
+    assert page.nav.absolute_index == 0
+    assert not page.nav.inverted
+
+    # Can't go up any further
+    page.controller.trigger('k')
     assert curses.flash.called
-    assert page.nav.absolute_index == 1
+    assert page.nav.absolute_index == 0
+    assert not page.nav.inverted
 
     # Page down
     page.controller.trigger('n')
@@ -117,4 +125,4 @@ def test_subscription_page(reddit, terminal, config, oauth, refresh_token):
     for ch in methods:
         curses.flash.reset_mock()
         page.controller.trigger(ch)
-        assert not curses.flash.called
+        assert curses.flash.called
