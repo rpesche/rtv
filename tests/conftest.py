@@ -88,6 +88,7 @@ def vcr(request):
 
     # Erase the cassettes before each run
     cassette_dir = os.path.join(os.path.dirname(__file__), 'cassettes')
+    os.makedirs(cassette_dir, exist_ok=True)
     if record_mode == 'once':
         for filename in os.listdir(cassette_dir):
             if filename.endswith('.yaml'):
@@ -122,18 +123,18 @@ def config():
 @pytest.yield_fixture()
 def stdscr():
     with patch('curses.initscr'),               \
-            patch('curses.endwin'),             \
-            patch('curses.doupdate'),           \
-            patch('curses.noecho'),             \
             patch('curses.echo'),               \
-            patch('curses.nocbreak'),           \
+            patch('curses.flash'),              \
+            patch('curses.endwin'),             \
+            patch('curses.noecho'),             \
             patch('curses.cbreak'),             \
-            patch('curses.start_color'),        \
+            patch('curses.doupdate'),           \
+            patch('curses.nocbreak'),           \
             patch('curses.curs_set'),           \
-            patch('curses.use_default_colors'), \
-            patch('curses.color_pair'),         \
             patch('curses.init_pair'),          \
-            patch('curses.flash'):
+            patch('curses.color_pair'),         \
+            patch('curses.start_color'),        \
+            patch('curses.use_default_colors'):
         out = MockStdscr(nlines=40, ncols=80, x=0, y=0)
         curses.initscr.return_value = out
         curses.color_pair.return_value = 23

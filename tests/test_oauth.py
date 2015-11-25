@@ -62,8 +62,6 @@ def test_authorize(oauth, reddit, stdscr, refresh_token):
         io.start.side_effect = lambda *_: oauth.params.update(**params)
 
         oauth.authorize()
-        message = 'Redirecting to reddit'.encode('utf-8')
-        stdscr.subwin.addstr.assert_any_call(1, 1, message)
         assert not open_browser.called
         oauth.reddit.get_access_information.assert_called_with(
             reddit, params['code'])
