@@ -88,6 +88,25 @@ class Terminal(object):
         return curses.flash()
 
     @staticmethod
+    def addch(window, y, x, ch, attr):
+        """
+        Curses addch() method that fixes a major bug in python 3.4.
+
+        See http://bugs.python.org/issue21088
+        """
+
+        if sys.version_info[:3] == (3, 4, 0):
+            y, x = x, y
+
+        window.addch(y, x, ch, attr)
+
+    def getch(self):
+        return self.stdscr.getch()
+
+    def nodelay(self, val):
+        return self.stdscr.nodelay(val)
+
+    @staticmethod
     @contextmanager
     def suspend():
         """
@@ -99,12 +118,6 @@ class Terminal(object):
             yield
         finally:
             curses.doupdate()
-
-    def getch(self):
-        return self.stdscr.getch()
-
-    def nodelay(self, val):
-        return self.stdscr.nodelay(val)
 
     def get_arrow(self, likes):
         """

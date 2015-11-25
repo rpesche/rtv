@@ -1,36 +1,32 @@
-import sys
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals
+
 import time
 import curses
 
 from .content import SubmissionContent
-from .page import Page, logged_in
-from .objects import Navigator, Controller
+from .page import Page, PageController, logged_in
+from .objects import Navigator, Color
 from .terminal import Terminal
 from .docs import COMMENT_FILE
 
 
-class SubmissionController(Controller):
+class SubmissionController(PageController):
     character_map = {}
 
 
 class SubmissionPage(Page):
 
-    def __init__(self, stdscr, reddit, config, oauth, url=None,
-                 submission=None):
-        """
-        Params:
-            url (string): URL of submission that will be loaded
-            submission (praw.Submission): Pre-loaded submission object
-        """
-
-        super(SubmissionPage, self).__init__(stdscr, reddit, config, oauth)
+    def __init__(self, reddit, term, config, oauth, url=None, submission=None):
+        super(SubmissionPage, self).__init__(reddit, term, config, oauth)
 
         if url:
-            self.content = SubmissionContent.from_url(reddit, url, self.loader)
+            self.content = SubmissionContent.from_url(reddit, url, term.loader)
         else:
-            self.content = SubmissionContent(submission, self.loader)
+            self.content = SubmissionContent(submission, term.loader)
 
         self.controller = SubmissionController(self)
+        # Start at the submission post, which is indexed as -1
         self.nav = Navigator(self.content.get, page_index=-1)
 
     @SubmissionController.register(curses.KEY_RIGHT, 'l', ' ')
@@ -40,9 +36,9 @@ class SubmissionPage(Page):
         current_index = self.nav.absolute_index
         self.content.toggle(current_index)
         if self.nav.inverted:
-            # Reset the page so that the bottom is at the cursor position.
-            # This is a workaround to handle if folding the causes the
-            # cursor index to go out of bounds.
+            # Reset the navigator so that the cursor is at the bottom of the
+            # page. This is a workaround to handle if folding the comment
+            # causes the cursor index to go out of bounds.
             self.nav.page_index, self.nav.cursor_index = current_index, 0
 
     @SubmissionController.register(curses.KEY_LEFT, 'h')
@@ -56,55 +52,65 @@ class SubmissionPage(Page):
         "Re-download comments and reset the page index"
 
         order = order or self.content.order
-        self.content = SubmissionContent.from_url(
-            self.reddit, self.content.name, self.loader, order=order)
-        self.nav = Navigator(self.content.get, page_index=-1)
+
+        with self.term.loader:
+            self.content = SubmissionContent.from_url(
+                self.reddit, self.content.name, self.term.loader, order=order)
+        if not self.term.loader.exception:
+            self.nav = Navigator(self.content.get, page_index=-1)
 
     @SubmissionController.register(curses.KEY_ENTER, Terminal.RETURN, 'o')
     def open_link(self):
-        "Open the current submission page with the webbrowser"
+        "Open the selected item with the webbrowser"
 
         data = self.content.get(self.nav.absolute_index)
         url = data.get('permalink')
         if url:
-            open_browser(url)
+            self.term.open_browser(url)
         else:
-            curses.flash()
+            self.term.flash()
 
     @SubmissionController.register('c')
     @logged_in
     def add_comment(self):
         """
-        Add a top-level comment if the submission is selected, or reply to the
-        selected comment.
+        Submit a reply to the selected item.
+
+        Selected item:
+            Submission - add a top level comment
+            Comment - add a comment reply
         """
 
         data = self.content.get(self.nav.absolute_index)
         if data['type'] == 'Submission':
-            content = data['text']
+            body = data['text']
+            reply = data['object'].add_comment
         elif data['type'] == 'Comment':
-            content = data['body']
+            body = data['body']
+            reply = data['object'].reply
         else:
-            curses.flash()
+            self.term.flash()
             return
 
-        # Comment out every line of the content
-        content = u'\n'.join([u'# |' + line for line in content.split('\n')])
+        # Construct the text that will be displayed in the editor file.
+        # The post body will be commented out and added for reference
+        lines = ['# |' + line for line in body.split('\n')]
+        content = '\n'.join(lines)
         comment_info = COMMENT_FILE.format(
-            author=data['author'], type=data['type'].lower(), content=content)
+            author=data['author'],
+            type=data['type'].lower(),
+            content=content)
 
-        comment_text = self.term.open_editor(comment_info)
-        if not comment_text:
-            self.show_notification('Aborted')
+        comment = self.term.open_editor(comment_info)
+        if not comment:
+            self.term.show_notification('Aborted')
             return
 
-        with self.loader(message='Posting', delay=0):
-            if data['type'] == 'Submission':
-                data['object'].add_comment(comment_text)
-            else:
-                data['object'].reply(comment_text)
+        with self.term.loader(message='Posting', delay=0):
+            reply(comment)
+            # Give reddit time to process the submission
             time.sleep(2.0)
-        if self.loader.exception is None:
+        if not self.term.loader.exception:
             self.refresh_content()
 
     @SubmissionController.register('d')
@@ -114,7 +120,7 @@ class SubmissionPage(Page):
         if self.nav.absolute_index != -1:
             self.delete()
         else:
-            curses.flash()
+            self.term.flash()
 
     def draw_item(self, win, data, inverted=False):
 
@@ -141,36 +147,30 @@ class SubmissionPage(Page):
 
             attr = curses.A_BOLD
             attr |= (Color.BLUE if not data['is_author'] else Color.GREEN)
-            self.add_line(win, u'{author} '.format(**data), row, 1, attr)
+            self.term.add_line(win, u'{author} '.format(**data), row, 1, attr)
 
             if data['flair']:
                 attr = curses.A_BOLD | Color.YELLOW
-                self.add_line(win, u'{flair} '.format(**data), attr=attr)
+                self.term.add_line(win, u'{flair} '.format(**data), attr=attr)
 
-            text, attr = self.get_arrow(data['likes'])
-            self.add_line(win, text, attr=attr)
-            self.add_line(win, u' {score} {created} '.format(**data))
+            text, attr = self.term.get_arrow(data['likes'])
+            self.term.add_line(win, text, attr=attr)
+            self.term.add_line(win, u' {score} {created} '.format(**data))
 
             if data['gold']:
-                text, attr = self.get_gold()
-                self.add_line(win, text, attr=attr)
+                text, attr = self.term.gold
+                self.term.add_line(win, text, attr=attr)
 
-        for row, text in enumerate(data['split_body'], start=offset + 1):
+        for row, text in enumerate(data['split_body'], start=offset+1):
             if row in valid_rows:
-                self.add_line(win, text, row, 1)
+                self.term.add_line(win, text, row, 1)
 
         # Unfortunately vline() doesn't support custom color so we have to
         # build it one segment at a time.
         attr = Color.get_level(data['level'])
+        x = 0
         for y in range(n_rows):
-            x = 0
-            # http://bugs.python.org/issue21088
-            if (sys.version_info.major,
-                    sys.version_info.minor,
-                    sys.version_info.micro) == (3, 4, 0):
-                x, y = y, x
-
-            win.addch(y, x, curses.ACS_VLINE, attr)
+            self.term.addch(win, y, x, curses.ACS_VLINE, attr)
 
         return attr | curses.ACS_VLINE
 
@@ -183,7 +183,7 @@ class SubmissionPage(Page):
         self.add_line(win, u' [{count}]'.format(**data), attr=curses.A_BOLD)
 
         attr = Color.get_level(data['level'])
-        win.addch(0, 0, curses.ACS_VLINE, attr)
+        self.term.addch(win, 0, 0, curses.ACS_VLINE, attr)
 
         return attr | curses.ACS_VLINE
 

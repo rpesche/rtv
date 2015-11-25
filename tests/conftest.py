@@ -5,6 +5,7 @@ import os
 import curses
 import logging
 from functools import partial
+from six.moves.urllib.parse import urlparse, parse_qs
 
 import praw
 import pytest
@@ -77,18 +78,26 @@ class MockStdscr(mock.MagicMock):
 @pytest.fixture(scope='session')
 def vcr(request):
 
-    def matcher(r1, r2):
+    def auth_matcher(r1, r2):
         return (r1.headers.get('authorization') ==
                 r2.headers.get('authorization'))
+
+    def uri_with_query_matcher(r1, r2):
+        "URI matcher that allows query params to appear in any order"
+        p1,  p2 = urlparse(r1.uri), urlparse(r2.uri)
+        return (p1[:3] == p2[:3] and
+                parse_qs(p1.query, True) == parse_qs(p2.query, True))
 
     # Use `none` to use the recorded requests, and `once` to delete existing
     # cassettes and re-record.
     record_mode = request.config.option.record_mode
     assert record_mode in ('once', 'none')
 
-    # Erase the cassettes before each run
     cassette_dir = os.path.join(os.path.dirname(__file__), 'cassettes')
-    os.makedirs(cassette_dir, exist_ok=True)
+    if not os.path.exists(cassette_dir):
+        os.makedirs(cassette_dir)
+
+    # Erase the cassettes before each run
     if record_mode == 'once':
         for filename in os.listdir(cassette_dir):
             if filename.endswith('.yaml'):
@@ -99,9 +108,10 @@ def vcr(request):
         record_mode=request.config.option.record_mode,
         filter_headers=[('Authorization', '**********')],
         filter_post_data_parameters=[('refresh_token', '**********')],
-        match_on=['uri', 'method', 'refresh_token', 'body'],
+        match_on=['method', 'uri_with_query', 'auth', 'body'],
         cassette_library_dir=cassette_dir)
-    vcr.register_matcher('refresh_token', matcher)
+    vcr.register_matcher('auth', auth_matcher)
+    vcr.register_matcher('uri_with_query', uri_with_query_matcher)
     return vcr
 
 

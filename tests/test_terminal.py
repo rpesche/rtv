@@ -77,6 +77,9 @@ def test_terminal_functions(terminal):
     assert curses.endwin.called
     assert curses.doupdate.called
 
+    terminal.addch(terminal.stdscr, 3, 5, 'ch', 'attr')
+    terminal.stdscr.addch.assert_called_with(3, 5, 'ch', 'attr')
+
 
 def test_terminal_clean_ascii(terminal):
 

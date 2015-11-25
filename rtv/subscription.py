@@ -1,3 +1,6 @@
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals
+
 import curses
 
 from .page import Page, PageController
@@ -13,7 +16,6 @@ class SubscriptionController(PageController):
 class SubscriptionPage(Page):
 
     def __init__(self, reddit, term, config, oauth):
-
         super(SubscriptionPage, self).__init__(reddit, term, config, oauth)
 
         self.content = SubscriptionContent.from_user(reddit, term.loader)
