@@ -33,7 +33,6 @@ class Terminal(object):
         self.stdscr = stdscr
         self.ascii = ascii
         self.loader = LoadScreen(self)
-
         self._display = None
 
     @property
@@ -184,7 +183,6 @@ class Terminal(object):
         # (window, text, attr)
         # (window, text, row, col)
         # (window, text, row, col, attr)
-
         cursor_row, cursor_col = window.getyx()
         row = row if row is not None else cursor_row
         col = col if col is not None else cursor_col

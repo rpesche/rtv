@@ -52,10 +52,11 @@ class SubmissionPage(Page):
         "Re-download comments and reset the page index"
 
         order = order or self.content.order
+        url = self.content.name
 
         with self.term.loader:
             self.content = SubmissionContent.from_url(
-                self.reddit, self.content.name, self.term.loader, order=order)
+                self.reddit, url, self.term.loader, order=order)
         if not self.term.loader.exception:
             self.nav = Navigator(self.content.get, page_index=-1)
 
@@ -114,26 +115,27 @@ class SubmissionPage(Page):
             self.refresh_content()
 
     @SubmissionController.register('d')
+    @logged_in
     def delete_comment(self):
         "Delete a comment as long as it is not the current submission"
 
         if self.nav.absolute_index != -1:
-            self.delete()
+            self.delete_item()
         else:
             self.term.flash()
 
-    def draw_item(self, win, data, inverted=False):
+    def _draw_item(self, win, data, inverted=False):
 
         if data['type'] == 'MoreComments':
-            return self.draw_more_comments(win, data)
+            return self._draw_more_comments(win, data)
         elif data['type'] == 'HiddenComment':
-            return self.draw_more_comments(win, data)
+            return self._draw_more_comments(win, data)
         elif data['type'] == 'Comment':
-            return self.draw_comment(win, data, inverted=inverted)
+            return self._draw_comment(win, data, inverted=inverted)
         else:
-            return self.draw_submission(win, data)
+            return self._draw_submission(win, data)
 
-    def draw_comment(self, win, data, inverted=False):
+    def _draw_comment(self, win, data, inverted=False):
 
         n_rows, n_cols = win.getmaxyx()
         n_cols -= 1
@@ -147,15 +149,15 @@ class SubmissionPage(Page):
 
             attr = curses.A_BOLD
             attr |= (Color.BLUE if not data['is_author'] else Color.GREEN)
-            self.term.add_line(win, u'{author} '.format(**data), row, 1, attr)
+            self.term.add_line(win, '{author} '.format(**data), row, 1, attr)
 
             if data['flair']:
                 attr = curses.A_BOLD | Color.YELLOW
-                self.term.add_line(win, u'{flair} '.format(**data), attr=attr)
+                self.term.add_line(win, '{flair} '.format(**data), attr=attr)
 
             text, attr = self.term.get_arrow(data['likes'])
             self.term.add_line(win, text, attr=attr)
-            self.term.add_line(win, u' {score} {created} '.format(**data))
+            self.term.add_line(win, ' {score} {created} '.format(**data))
 
             if data['gold']:
                 text, attr = self.term.gold
@@ -174,38 +176,38 @@ class SubmissionPage(Page):
 
         return attr | curses.ACS_VLINE
 
-    def draw_more_comments(self, win, data):
+    def _draw_more_comments(self, win, data):
 
         n_rows, n_cols = win.getmaxyx()
         n_cols -= 1
 
-        self.add_line(win, u'{body}'.format(**data), 0, 1)
-        self.add_line(win, u' [{count}]'.format(**data), attr=curses.A_BOLD)
+        self.term.add_line(win, '{body}'.format(**data), 0, 1)
+        self.term.add_line(win, ' [{count}]'.format(**data), attr=curses.A_BOLD)
 
         attr = Color.get_level(data['level'])
         self.term.addch(win, 0, 0, curses.ACS_VLINE, attr)
 
         return attr | curses.ACS_VLINE
 
-    def draw_submission(self, win, data):
+    def _draw_submission(self, win, data):
 
         n_rows, n_cols = win.getmaxyx()
         n_cols -= 3  # one for each side of the border + one for offset
 
         for row, text in enumerate(data['split_title'], start=1):
-            self.add_line(win, text, row, 1, curses.A_BOLD)
+            self.term.add_line(win, text, row, 1, curses.A_BOLD)
 
         row = len(data['split_title']) + 1
         attr = curses.A_BOLD | Color.GREEN
-        self.add_line(win, u'{author}'.format(**data), row, 1, attr)
+        self.term.add_line(win, '{author}'.format(**data), row, 1, attr)
         attr = curses.A_BOLD | Color.YELLOW
         if data['flair']:
-            self.add_line(win, u' {flair}'.format(**data), attr=attr)
-        self.add_line(win, u' {created} {subreddit}'.format(**data))
+            self.term.add_line(win, ' {flair}'.format(**data), attr=attr)
+        self.term.add_line(win, ' {created} {subreddit}'.format(**data))
 
         row = len(data['split_title']) + 2
         attr = curses.A_UNDERLINE | Color.BLUE
-        self.add_line(win, u'{url}'.format(**data), row, 1, attr)
+        self.term.add_line(win, '{url}'.format(**data), row, 1, attr)
         offset = len(data['split_title']) + 3
 
         # Cut off text if there is not enough room to display the whole post
@@ -216,20 +218,20 @@ class SubmissionPage(Page):
             split_text.append('(Not enough space to display)')
 
         for row, text in enumerate(split_text, start=offset):
-            self.add_line(win, text, row, 1)
+            self.term.add_line(win, text, row, 1)
 
         row = len(data['split_title']) + len(split_text) + 3
-        self.add_line(win, u'{score} '.format(**data), row, 1)
-        text, attr = self.get_arrow(data['likes'])
-        self.add_line(win, text, attr=attr)
-        self.add_line(win, u' {comments} '.format(**data))
+        self.term.add_line(win, '{score} '.format(**data), row, 1)
+        text, attr = self.term.get_arrow(data['likes'])
+        self.term.add_line(win, text, attr=attr)
+        self.term.add_line(win, ' {comments} '.format(**data))
 
         if data['gold']:
-            text, attr = self.get_gold()
-            self.add_line(win, text, attr=attr)
+            text, attr = self.term.gold
+            self.term.add_line(win, text, attr=attr)
 
         if data['nsfw']:
             text, attr = 'NSFW', (curses.A_BOLD | Color.RED)
-            self.add_line(win, text, attr=attr)
+            self.term.add_line(win, text, attr=attr)
 
         win.border()

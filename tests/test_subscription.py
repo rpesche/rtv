@@ -40,7 +40,6 @@ def test_subscription_page_draw(reddit, terminal, config, oauth, refresh_token):
     # Reload with a smaller terminal window
     terminal.stdscr.ncols = 20
     terminal.stdscr.nlines = 10
-    window.reset_mock()
     with terminal.loader():
         page = SubscriptionPage(reddit, terminal, config, oauth)
     assert terminal.loader.exception is None

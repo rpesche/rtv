@@ -50,7 +50,7 @@ class Page(object):
         raise NotImplementedError
 
     @staticmethod
-    def draw_item(window, data, inverted):
+    def _draw_item(window, data, inverted):
         raise NotImplementedError
 
     def loop(self):
@@ -165,7 +165,7 @@ class Page(object):
 
     @PageController.register('d')
     @logged_in
-    def delete(self):
+    def delete_item(self):
         """
         Delete a submission or comment.
         """
@@ -310,7 +310,7 @@ class Page(object):
             start = current_row - window_rows if inverted else current_row
             subwindow = self._content_window.derwin(
                 window_rows, window_cols, start, data['offset'])
-            attr = self.draw_item(subwindow, data, inverted)
+            attr = self._draw_item(subwindow, data, inverted)
             self._subwindows.append((subwindow, attr))
             available_rows -= (window_rows + 1)  # Add one for the blank line
             current_row += step * (window_rows + 1)

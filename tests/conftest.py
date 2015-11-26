@@ -148,6 +148,7 @@ def stdscr():
         out = MockStdscr(nlines=40, ncols=80, x=0, y=0)
         curses.initscr.return_value = out
         curses.color_pair.return_value = 23
+        curses.ACS_VLINE = 0
         yield out
 
 

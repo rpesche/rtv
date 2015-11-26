@@ -50,7 +50,7 @@ class SubscriptionPage(Page):
 
         self.active = False
 
-    def draw_item(self, win, data, inverted=False):
+    def _draw_item(self, win, data, inverted=False):
         n_rows, n_cols = win.getmaxyx()
         n_cols -= 1  # Leave space for the cursor in the first column
 
@@ -61,7 +61,7 @@ class SubscriptionPage(Page):
         row = offset
         if row in valid_rows:
             attr = curses.A_BOLD | Color.YELLOW
-            self.term.add_line(win, u'{name}'.format(**data), row, 1, attr)
+            self.term.add_line(win, '{name}'.format(**data), row, 1, attr)
 
         row = offset + 1
         for row, text in enumerate(data['split_title'], start=row):
