@@ -5,15 +5,13 @@ import time
 import curses
 
 import six
-import requests
 
 from . import docs
-from .exceptions import SubredditError, AccountError
+from .content import SubredditContent
 from .page import Page, PageController, logged_in
-from .objects import Navigator
+from .objects import Navigator, Color
 from .submission import SubmissionPage
 from .subscription import SubscriptionPage
-from .content import SubredditContent
 from .terminal import Terminal
 
 
@@ -23,16 +21,15 @@ class SubredditController(PageController):
 
 class SubredditPage(Page):
 
-    def __init__(self, stdscr, reddit, config, oauth, name, url=None):
+    def __init__(self, reddit, term, config, oauth, name, url=None):
         """
         Params:
             name (string): Name of subreddit to open
             url (string): Optional submission to load upon start
         """
+        super(SubredditPage, self).__init__(reddit, term, config, oauth)
 
-        super(SubredditPage, self).__init__(stdscr, reddit, config, oauth)
-
-        self.content = SubredditContent.from_name(reddit, name, self.loader)
+        self.content = SubredditContent.from_name(reddit, name, term.loader)
         self.controller = SubredditController(self)
         self.nav = Navigator(self.content.get)
 
@@ -51,16 +48,10 @@ class SubredditPage(Page):
         if order == 'ignore':
             order = None
 
-        try:
+        with self.term.loader():
             self.content = SubredditContent.from_name(
-                self.reddit, name, self.loader, order=order)
-        except AccountError:
-            self.show_notification('Not logged in')
-        except SubredditError:
-            self.show_notification('Invalid subreddit')
-        except requests.HTTPError:
-            self.show_notification('Could not reach subreddit')
-        else:
+                self.reddit, name, self.term.loader, order=order)
+        if not self.term.loader.exception:
             self.nav = Navigator(self.content.get)
 
     @SubredditController.register('f')
@@ -69,23 +60,21 @@ class SubredditPage(Page):
 
         name = name or self.content.name
 
-        query = self.prompt_input('Search {}:'.format(name))
+        query = self.term.prompt_input('Search {0}:'.format(name))
         if query is None:
             return
 
-        try:
+        with self.term.loader():
             self.content = SubredditContent.from_name(
-                self.reddit, name, self.loader, query=query)
-        except (IndexError, SubredditError):
-            self.show_notification('No results found')
-        else:
+                self.reddit, name, self.term.loader, query=query)
+        if not self.term.loader.exception:
             self.nav = Navigator(self.content.get)
 
     @SubredditController.register('/')
     def prompt_subreddit(self):
         "Open a prompt to navigate to a different subreddit"
 
-        name = self.prompt_input('Enter Subreddit: /r/')
+        name = self.term.prompt_input('Enter Subreddit: /r/')
         if name is not None:
             self.refresh_content(name=name, order='ignore')
 
@@ -99,8 +88,12 @@ class SubredditPage(Page):
         else:
             url_type = None
 
-        page = SubmissionPage(
-            self.stdscr, self.reddit, self.config, self.oauth, url=url)
+        with self.term.loader():
+            page = SubmissionPage(
+                self.reddit, self.term, self.config, self.oauth, url=url)
+        if self.term.loader.exception:
+            return
+
         page.loop()
 
         if url_type == 'selfpost':
@@ -113,12 +106,16 @@ class SubredditPage(Page):
         data = self.content.get(self.nav.absolute_index)
         url = data['url_full']
 
-        if data['url_type'] in ['x-post', 'selfpost']:
-            page = SubmissionPage(
-                self.stdscr, self.reddit, self.config, self.oauth, url=url)
-            page.loop()
+        if data['url_type'] not in ('x-post', 'selfpost'):
+            self.term.open_browser(url)
         else:
-            open_browser(url)
+            with self.term.loader():
+                page = SubmissionPage(
+                    self.reddit, self.term, self.config, self.oauth, url=url)
+            if self.term.loader.exception:
+                return
+
+            page.loop()
 
         self.config.history.add(url)
 
@@ -127,44 +124,51 @@ class SubredditPage(Page):
     def post_submission(self):
         "Post a new submission to the given subreddit"
 
-        # Strips the subreddit to just the name
-        # Make sure it is a valid subreddit for submission
+        # Check that the subreddit can be submitted to
         subreddit = self.reddit.get_subreddit(self.content.name)
-        sub = six.text_type(subreddit).split('/')[2]
-        if '+' in sub or sub in ('all', 'front', 'me'):
-            self.show_notification('Invalid subreddit')
+        sub_name = six.text_type(subreddit).split('/')[2]
+        if '+' in sub_name or sub_name in ('all', 'front', 'me'):
+            self.term.show_notification('Invalid subreddit')
             return
 
-        submission_info = docs.SUBMISSION_FILE.format(name=subreddit, content='')
-
-        submission_text = self.term.open_editor(submission_info)
-        if not submission_text:
-            self.show_notification('Aborted')
+        submission_info = docs.SUBMISSION_FILE.format(
+            name=subreddit, content='')
+        text = self.term.open_editor(submission_info)
+        if not text or '\n' not in text:
+            self.term.show_notification('Aborted')
             return
-        elif '\n' not in submission_text:
-            self.show_notification('No content')
-            return
-        else:
-            title, content = submission_text.split('\n', 1)
 
-        with self.loader(message='Posting', delay=0):
-            post = self.reddit.submit(sub, title, text=content)
+        title, content = text.split('\n', 1)
+        with self.term.loader(message='Posting', delay=0):
+            post = self.reddit.submit(sub_name, title, text=content)
+            # Give reddit time to process the submission
             time.sleep(2.0)
+        if self.term.loader.exception:
+            return
 
-        if self.loader.exception is None:
-            # Open the newly created post
-            page = SubmissionPage(self.stdscr, self.reddit, self.config,
-                                  self.oauth, submission=post)
-            page.loop()
-            self.refresh_content()
+        # Open the newly created post
+        with self.term.loader():
+            page = SubmissionPage(
+                self.reddit, self.term, self.config, self.oauth,
+                submission=post)
+        if self.term.loader.exception:
+            return
+
+        page.loop()
+
+        self.refresh_content()
 
     @SubredditController.register('s')
     @logged_in
     def open_subscriptions(self):
         "Open user subscriptions page"
 
-        page = SubscriptionPage(
-            self.stdscr, self.reddit, self.config, self.oauth)
+        with self.term.loader():
+            page = SubscriptionPage(
+                self.reddit, self.term, self.config, self.oauth)
+        if self.term.loader.exception:
+            return
+
         page.loop()
 
         # When the user has chosen a subreddit in the subscriptions list,
@@ -172,7 +176,7 @@ class SubredditPage(Page):
         if page.subreddit_data is not None:
             self.refresh_content(name=page.subreddit_data['name'])
 
-    def draw_item(self, win, data, inverted=False):
+    def _draw_item(self, win, data, inverted=False):
 
         n_rows, n_cols = win.getmaxyx()
         n_cols -= 1  # Leave space for the cursor in the first column
@@ -184,35 +188,36 @@ class SubredditPage(Page):
         n_title = len(data['split_title'])
         for row, text in enumerate(data['split_title'], start=offset):
             if row in valid_rows:
-                self.add_line(win, text, row, 1, curses.A_BOLD)
+                self.term.add_line(win, text, row, 1, curses.A_BOLD)
 
         row = n_title + offset
         if row in valid_rows:
             seen = (data['url_full'] in self.config.history)
             link_color = Color.MAGENTA if seen else Color.BLUE
             attr = curses.A_UNDERLINE | link_color
-            self.add_line(win, u'{url}'.format(**data), row, 1, attr)
+            self.term.add_line(win, '{url}'.format(**data), row, 1, attr)
 
         row = n_title + offset + 1
         if row in valid_rows:
-            self.add_line(win, u'{score} '.format(**data), row, 1)
-            text, attr = self.get_arrow(data['likes'])
-            self.add_line(win, text, attr=attr)
-            self.add_line(win, u' {created} {comments} '.format(**data))
+            self.term.add_line(win, '{score} '.format(**data), row, 1)
+            text, attr = self.term.get_arrow(data['likes'])
+            self.term.add_line(win, text, attr=attr)
+            self.term.add_line(win, ' {created} {comments} '.format(**data))
 
             if data['gold']:
-                text, attr = self.get_gold()
-                self.add_line(win, text, attr=attr)
+                text, attr = self.term.gold
+                self.term.add_line(win, text, attr=attr)
 
             if data['nsfw']:
                 text, attr = 'NSFW', (curses.A_BOLD | Color.RED)
-                self.add_line(win, text, attr=attr)
+                self.term.add_line(win, text, attr=attr)
 
         row = n_title + offset + 2
         if row in valid_rows:
-            self.add_line(
-                win, u'{author}'.format(**data), row, 1, curses.A_BOLD)
-            self.add_line(
-                win, u' /r/{subreddit}'.format(**data), attr=Color.YELLOW)
+            text = '{author}'.format(**data)
+            self.term.add_line(win, text, row, 1, curses.A_BOLD)
+            text = ' /r/{subreddit}'.format(**data)
+            self.term.add_line(win, text, attr=Color.YELLOW)
             if data['flair']:
-                self.add_line(win, u' {flair}'.format(**data), attr=Color.RED)
+                text = ' {flair}'.format(**data)
+                self.term.add_line(win, text, attr=Color.RED)

@@ -7,19 +7,15 @@ import logging
 
 import praw
 import tornado
-from praw.errors import PRAWException
-from requests.exceptions import RequestException
 
 from . import docs
 from .config import Config
-from .exceptions import RTVError
+from .oauth import OAuthHelper
+from .terminal import Terminal
 from .objects import curses_session
 from .subreddit import SubredditPage
-from .terminal import Terminal
-from .oauth import OAuthHelper
 from .__version__ import __version__
 
-__all__ = []
 _logger = logging.getLogger(__name__)
 
 # Pycharm debugging note:
@@ -46,8 +42,11 @@ def main():
     config = Config()
     config.from_file()
     config.from_args()
+
+    # Load the browsing history from previous sessions
     config.load_history()
 
+    # Load any previously saved auth session token
     config.load_refresh_token()
     if config['clear_auth']:
         config.delete_refresh_token()
@@ -55,30 +54,41 @@ def main():
     if config['log']:
         logging.basicConfig(level=logging.DEBUG, filename=config['log'])
     else:
-        # Add a handler so the logger doesn't complain
+        # Add an empty handler so the logger doesn't complain
         logging.root.addHandler(logging.NullHandler())
 
+    # Construct the reddit user agent
+    user_agent = docs.AGENT.format(version=__version__)
+
     try:
-        print('Connecting...')
-        user_agent = docs.AGENT.format(version=__version__)
-        reddit = praw.Reddit(user_agent=user_agent, decode_html_entities=False)
         with curses_session() as stdscr:
             term = Terminal(stdscr, config['ascii'])
+            with term.loader(catch_exception=False):
+                reddit = praw.Reddit(
+                    user_agent=user_agent,
+                    decode_html_entities=False,
+                    disable_update_check=True)
 
             # Authorize on launch if the refresh token is present
             oauth = OAuthHelper(reddit, term, config)
             if config.refresh_token:
                 oauth.authorize()
 
-            page = SubredditPage(stdscr, reddit, config, oauth,
-                                 name=config['subreddit'], url=config['link'])
+            with term.loader():
+                page = SubredditPage(
+                    reddit, term, config, oauth,
+                    name=config['subreddit'], url=config['link'])
+            if term.loader.exception:
+                return
+
             page.loop()
-    except (RequestException, PRAWException, RTVError) as e:
+    except Exception as e:
         _logger.exception(e)
-        print('{0}: {1}'.format(type(e).__name__, e))
+        raise e
     except KeyboardInterrupt:
         pass
     finally:
+        # Try to save the browsing history
         config.save_history()
         # Ensure sockets are closed to prevent a ResourceWarning
         if 'reddit' in locals():

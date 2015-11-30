@@ -22,7 +22,7 @@ def test_load_screen(terminal, stdscr, ascii):
     assert terminal.loader.exception is None
     assert stdscr.subwin.ncols == 10
     assert stdscr.subwin.nlines == 3
-    stdscr.refresh.assert_called()
+    assert not stdscr.refresh.called
 
 
 @pytest.mark.parametrize('ascii', [True, False])
@@ -36,7 +36,7 @@ def test_load_screen_exception_unhandled(terminal, stdscr, ascii):
             raise Exception()
     assert not terminal.loader._is_running
     assert not terminal.loader._animator.is_alive()
-    stdscr.refresh.assert_called()
+    assert not stdscr.refresh.called
 
 
 @pytest.mark.parametrize('ascii', [True, False])
@@ -52,7 +52,21 @@ def test_load_screen_exception_handled(terminal, stdscr, ascii):
     assert isinstance(terminal.loader.exception, requests.ConnectionError)
     error_message = 'Connection Error'.encode('ascii' if ascii else 'utf-8')
     stdscr.subwin.addstr.assert_called_with(1, 1, error_message)
-    stdscr.refresh.assert_called()
+    assert not stdscr.refresh.called
+
+
+@pytest.mark.parametrize('ascii', [True, False])
+def test_load_screen_exception_not_caught(terminal, stdscr, ascii):
+    terminal.ascii = ascii
+
+    with pytest.raises(KeyboardInterrupt):
+        with terminal.loader(delay=0, catch_exception=False):
+            assert terminal.loader._animator.is_alive()
+            raise KeyboardInterrupt()
+    assert not terminal.loader._is_running
+    assert not terminal.loader._animator.is_alive()
+    assert isinstance(terminal.loader.exception, requests.ConnectionError)
+    assert not stdscr.refresh.called
 
 
 @pytest.mark.parametrize('ascii', [True, False])
@@ -66,7 +80,7 @@ def test_load_screen_keyboard_interrupt(terminal, stdscr, ascii):
     assert not terminal.loader._is_running
     assert not terminal.loader._animator.is_alive()
     assert isinstance(terminal.loader.exception, KeyboardInterrupt)
-    stdscr.refresh.assert_called()
+    assert not stdscr.refresh.called
 
 
 @pytest.mark.parametrize('ascii', [True, False])
@@ -76,7 +90,7 @@ def test_load_screen_initial_delay(terminal, stdscr, ascii):
     # If we don't reach the initial delay nothing should be drawn
     with terminal.loader(delay=0.1):
         time.sleep(0.05)
-    stdscr.subwin.addstr.assert_not_called()
+    assert not stdscr.subwin.addstr.called
 
 
 @pytest.mark.parametrize('ascii', [True, False])

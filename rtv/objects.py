@@ -131,6 +131,7 @@ class LoadScreen(object):
     def __init__(self, terminal):
 
         self.exception = None
+        self.catch_exception = None
         self.depth = 0
         self._terminal = weakref.proxy(terminal)
         self._args = None
@@ -138,7 +139,7 @@ class LoadScreen(object):
         self._is_running = None
 
     def __call__(self, delay=0.5, interval=0.4, message='Downloading',
-                 trail='...'):
+                 trail='...', catch_exception=True):
         """
         Params:
             delay (float): Length of time that the loader will wait before
@@ -148,12 +149,16 @@ class LoadScreen(object):
             message (str): Message to display
             trail (str): Trail of characters that will be animated by the
                 loading screen.
+            catch_exception (bool): If an exception occurs while the loader is
+                active, this flag determines whether it is caught or allowed to
+                bubble up.
         """
 
         if self.depth > 0:
             return self
 
         self.exception = None
+        self.catch_exception = catch_exception
         self._args = (delay, interval, message, trail)
         return self
 
@@ -179,7 +184,7 @@ class LoadScreen(object):
         self._animator.join()
         self._terminal.stdscr.refresh()
 
-        if e is not None:
+        if self.catch_exception and e is not None:
             # Log the exception and attach it so the caller can inspect it
             self.exception = e
             _logger.info('Loader caught: {0} - {1}'.format(type(e).__name__, e))
