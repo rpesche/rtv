@@ -3,6 +3,7 @@ from __future__ import unicode_literals
 
 import os
 import sys
+import time
 import codecs
 import curses
 import webbrowser
@@ -102,9 +103,6 @@ class Terminal(object):
     def getch(self):
         return self.stdscr.getch()
 
-    def nodelay(self, val):
-        return self.stdscr.nodelay(val)
-
     @staticmethod
     @contextmanager
     def suspend():
@@ -117,6 +115,20 @@ class Terminal(object):
             yield
         finally:
             curses.doupdate()
+
+    @contextmanager
+    def no_delay(self):
+        """
+        Temporarily turn off character delay mode. In this mode, getch will not
+        block while waiting for input and will return -1 if no key has been
+        pressed.
+        """
+
+        try:
+            self.stdscr.nodelay(1)
+            yield
+        finally:
+            self.stdscr.nodelay(0)
 
     def get_arrow(self, likes):
         """
@@ -197,12 +209,14 @@ class Terminal(object):
         params = [] if attr is None else [attr]
         window.addstr(row, col, text, *params)
 
-    def show_notification(self, message):
+    def show_notification(self, message, timeout=None):
         """
         Overlay a message box on the center of the screen and wait for input.
 
         Params:
             message (list or string): List of strings, one per line.
+            timeout (float): Optional, maximum length of time that the message
+                will be shown before disappearing.
         """
 
         if isinstance(message, six.string_types):
@@ -228,7 +242,14 @@ class Terminal(object):
         for index, line in enumerate(message, start=1):
             self.add_line(window, line, index, 1)
         window.refresh()
-        ch = self.stdscr.getch()
+
+        ch, start = -1, time.time()
+        with self.no_delay():
+            while timeout is None or time.time() - start < timeout:
+                ch = self.getch()
+                if ch != -1:
+                    break
+                time.sleep(0.01)
 
         window.clear()
         del window
@@ -364,7 +385,7 @@ class Terminal(object):
         self.stdscr.refresh()
         if key:
             curses.curs_set(1)
-            ch = self.stdscr.getch()
+            ch = self.getch()
             # We can't convert the character to unicode, because it may return
             # Invalid values for keys that don't map to unicode characters,
             # e.g. F1

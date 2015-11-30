@@ -91,7 +91,7 @@ class OAuthHelper(object):
             # Open a background browser (e.g. firefox) which is non-blocking.
             # Stop the iloop when the user hits the auth callback, at which
             # point we continue and check the callback params.
-            with self.term.loader(message='Waiting for authorization'):
+            with self.term.loader(message='Opening browser for authorization'):
                 self.term.open_browser(authorize_url)
                 io.start()
             if self.term.loader.exception:

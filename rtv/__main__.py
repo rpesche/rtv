@@ -84,7 +84,7 @@ def main():
             page.loop()
     except Exception as e:
         _logger.exception(e)
-        raise e
+        raise
     except KeyboardInterrupt:
         pass
     finally:

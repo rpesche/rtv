@@ -245,10 +245,9 @@ class Page(object):
         Clear excessive input caused by the scroll wheel or holding down a key
         """
 
-        self.term.nodelay(1)
-        while self.term.getch() != -1:
-            continue
-        self.term.nodelay(0)
+        with self.term.no_delay():
+            while self.term.getch() != -1:
+                continue
 
     def draw(self):
 
@@ -273,8 +272,9 @@ class Page(object):
         n_rows, n_cols = self._header_window.getmaxyx()
 
         self._header_window.erase()
-        attr = curses.A_REVERSE | curses.A_BOLD | Color.CYAN
-        self._header_window.bkgd(' ', attr)
+        # curses.bkgd expects bytes in py2 and unicode in py3
+        ch, attr = str(' '), curses.A_REVERSE | curses.A_BOLD | Color.CYAN
+        self._header_window.bkgd(ch, attr)
 
         sub_name = self.content.name.replace('/r/front', 'Front Page')
         self.term.add_line(self._header_window, sub_name, 0, 0)

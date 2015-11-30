@@ -193,6 +193,8 @@ class LoadScreen(object):
                 if isinstance(e, base):
                     if message:
                         self._terminal.show_notification(message)
+                    else:
+                        self._terminal.show_notification("Stopped", 0.5)
                     break
             else:
                 return  # Re-raise unhandled exceptions
@@ -217,6 +219,7 @@ class LoadScreen(object):
                 if not self._is_running:
                     window.clear()
                     del window
+                    self._terminal.stdscr.refresh()
                     return
 
                 window.erase()
