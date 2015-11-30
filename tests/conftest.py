@@ -72,6 +72,8 @@ class MockStdscr(mock.MagicMock):
         self.subwin.ncols = ncols
         self.subwin.x = 0
         self.subwin.y = 0
+        if 'getch' not in dir(self.subwin):
+            self.subwin.getch = mock.Mock(return_value=-1)
         return self.subwin
 
 
@@ -146,6 +148,7 @@ def stdscr():
             patch('curses.start_color'),        \
             patch('curses.use_default_colors'):
         out = MockStdscr(nlines=40, ncols=80, x=0, y=0)
+        out.getch = mock.Mock(return_value=-1)
         curses.initscr.return_value = out
         curses.color_pair.return_value = 23
         curses.ACS_VLINE = 0
@@ -168,7 +171,12 @@ def reddit(vcr, request):
 
 @pytest.yield_fixture()
 def terminal(stdscr, config):
-    yield Terminal(stdscr, ascii=config['ascii'])
+
+    term = Terminal(stdscr, ascii=config['ascii'])
+
+    # Disable the addch patch so the mock stdscr will be called consitantly.
+    term.addch = lambda window, *args: window.addch(*args)
+    yield term
 
 
 @pytest.yield_fixture()

@@ -10,12 +10,12 @@ import tornado
 from praw.errors import PRAWException
 from requests.exceptions import RequestException
 
+from . import docs
 from .config import Config
 from .exceptions import RTVError
 from .objects import curses_session
 from .subreddit import SubredditPage
 from .terminal import Terminal
-from .docs import AGENT
 from .oauth import OAuthHelper
 from .__version__ import __version__
 
@@ -60,7 +60,7 @@ def main():
 
     try:
         print('Connecting...')
-        user_agent = AGENT.format(version=__version__)
+        user_agent = docs.AGENT.format(version=__version__)
         reddit = praw.Reddit(user_agent=user_agent, decode_html_entities=False)
         with curses_session() as stdscr:
             term = Terminal(stdscr, config['ascii'])

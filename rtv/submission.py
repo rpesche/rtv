@@ -4,11 +4,11 @@ from __future__ import unicode_literals
 import time
 import curses
 
+from . import docs
 from .content import SubmissionContent
 from .page import Page, PageController, logged_in
 from .objects import Navigator, Color
 from .terminal import Terminal
-from .docs import COMMENT_FILE
 
 
 class SubmissionController(PageController):
@@ -54,7 +54,7 @@ class SubmissionPage(Page):
         order = order or self.content.order
         url = self.content.name
 
-        with self.term.loader:
+        with self.term.loader():
             self.content = SubmissionContent.from_url(
                 self.reddit, url, self.term.loader, order=order)
         if not self.term.loader.exception:
@@ -97,7 +97,7 @@ class SubmissionPage(Page):
         # The post body will be commented out and added for reference
         lines = ['# |' + line for line in body.split('\n')]
         content = '\n'.join(lines)
-        comment_info = COMMENT_FILE.format(
+        comment_info = docs.COMMENT_FILE.format(
             author=data['author'],
             type=data['type'].lower(),
             content=content)

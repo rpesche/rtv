@@ -74,7 +74,6 @@ def test_subscription_page(reddit, terminal, config, oauth, refresh_token):
     page.draw()
 
     # Move cursor to the bottom of the page
-    terminal.stdscr.getch.return_value = -1
     while not curses.flash.called:
         page.controller.trigger('j')
     curses.flash.reset_mock()

@@ -130,11 +130,15 @@ class Page(object):
         if 'likes' not in data:
             self.term.flash()
         elif data['likes']:
-            data['object'].clear_vote()
-            data['likes'] = None
+            with self.term.loader():
+                data['object'].clear_vote()
+            if not self.term.loader.exception:
+                data['likes'] = None
         else:
-            data['object'].upvote()
-            data['likes'] = True
+            with self.term.loader():
+                data['object'].upvote()
+            if not self.term.loader.exception:
+                data['likes'] = True
 
     @PageController.register('z')
     @logged_in
@@ -143,11 +147,15 @@ class Page(object):
         if 'likes' not in data:
             self.term.flash()
         elif data['likes'] or data['likes'] is None:
-            data['object'].downvote()
-            data['likes'] = False
+            with self.term.loader():
+                data['object'].downvote()
+            if not self.term.loader.exception:
+                data['likes'] = False
         else:
-            data['object'].clear_vote()
-            data['likes'] = None
+            with self.term.loader():
+                data['object'].clear_vote()
+            if not self.term.loader.exception:
+                data['likes'] = None
 
     @PageController.register('u')
     def login(self):
@@ -176,13 +184,13 @@ class Page(object):
             return
 
         prompt = 'Are you sure you want to delete this? (y/n): '
-        char = self.term.prompt_input(prompt)
-        if char != 'y':
+        if not self.term.prompt_y_or_n(prompt):
             self.term.show_notification('Aborted')
             return
 
         with self.term.loader(message='Deleting', delay=0):
             data['object'].delete()
+            # Give reddit time to process the request
             time.sleep(2.0)
         if self.term.loader.exception is None:
             self.refresh_content()

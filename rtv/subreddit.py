@@ -7,6 +7,7 @@ import curses
 import six
 import requests
 
+from . import docs
 from .exceptions import SubredditError, AccountError
 from .page import Page, PageController, logged_in
 from .objects import Navigator
@@ -14,7 +15,6 @@ from .submission import SubmissionPage
 from .subscription import SubscriptionPage
 from .content import SubredditContent
 from .terminal import Terminal
-from .docs import SUBMISSION_FILE
 
 
 class SubredditController(PageController):
@@ -135,7 +135,7 @@ class SubredditPage(Page):
             self.show_notification('Invalid subreddit')
             return
 
-        submission_info = SUBMISSION_FILE.format(name=subreddit, content='')
+        submission_info = docs.SUBMISSION_FILE.format(name=subreddit, content='')
 
         submission_text = self.term.open_editor(submission_info)
         if not submission_text:
