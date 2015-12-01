@@ -235,7 +235,7 @@ class Terminal(object):
         s_row = (n_rows - box_height) // 2
         s_col = (n_cols - box_width) // 2
 
-        window = self.stdscr.derwin(box_height, box_width, s_row, s_col)
+        window = curses.newwin(box_height, box_width, s_row, s_col)
         window.erase()
         window.border()
 
@@ -253,6 +253,7 @@ class Terminal(object):
 
         window.clear()
         del window
+        self.stdscr.touchwin()
         self.stdscr.refresh()
 
         return ch

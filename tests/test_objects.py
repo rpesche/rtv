@@ -22,7 +22,6 @@ def test_load_screen(terminal, stdscr, ascii):
     assert terminal.loader.exception is None
     assert stdscr.subwin.ncols == 10
     assert stdscr.subwin.nlines == 3
-    assert not stdscr.refresh.called
 
 
 @pytest.mark.parametrize('ascii', [True, False])
@@ -36,7 +35,6 @@ def test_load_screen_exception_unhandled(terminal, stdscr, ascii):
             raise Exception()
     assert not terminal.loader._is_running
     assert not terminal.loader._animator.is_alive()
-    assert not stdscr.refresh.called
 
 
 @pytest.mark.parametrize('ascii', [True, False])
@@ -52,7 +50,6 @@ def test_load_screen_exception_handled(terminal, stdscr, ascii):
     assert isinstance(terminal.loader.exception, requests.ConnectionError)
     error_message = 'Connection Error'.encode('ascii' if ascii else 'utf-8')
     stdscr.subwin.addstr.assert_called_with(1, 1, error_message)
-    assert not stdscr.refresh.called
 
 
 @pytest.mark.parametrize('ascii', [True, False])
@@ -65,8 +62,7 @@ def test_load_screen_exception_not_caught(terminal, stdscr, ascii):
             raise KeyboardInterrupt()
     assert not terminal.loader._is_running
     assert not terminal.loader._animator.is_alive()
-    assert isinstance(terminal.loader.exception, requests.ConnectionError)
-    assert not stdscr.refresh.called
+    assert terminal.loader.exception is None
 
 
 @pytest.mark.parametrize('ascii', [True, False])
@@ -80,7 +76,6 @@ def test_load_screen_keyboard_interrupt(terminal, stdscr, ascii):
     assert not terminal.loader._is_running
     assert not terminal.loader._animator.is_alive()
     assert isinstance(terminal.loader.exception, KeyboardInterrupt)
-    assert not stdscr.refresh.called
 
 
 @pytest.mark.parametrize('ascii', [True, False])

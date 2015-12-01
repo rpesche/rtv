@@ -14,6 +14,7 @@ from vcr import VCR
 from rtv.config import Config
 from rtv.terminal import Terminal
 from rtv.oauth import OAuthHelper
+from rtv.page import Page
 
 try:
     from unittest import mock
@@ -72,8 +73,6 @@ class MockStdscr(mock.MagicMock):
         self.subwin.ncols = ncols
         self.subwin.x = 0
         self.subwin.y = 0
-        if 'getch' not in dir(self.subwin):
-            self.subwin.getch = mock.Mock(return_value=-1)
         return self.subwin
 
 
@@ -98,12 +97,6 @@ def vcr(request):
     cassette_dir = os.path.join(os.path.dirname(__file__), 'cassettes')
     if not os.path.exists(cassette_dir):
         os.makedirs(cassette_dir)
-
-    # Erase the cassettes before each run
-    if record_mode == 'once':
-        for filename in os.listdir(cassette_dir):
-            if filename.endswith('.yaml'):
-                os.remove(os.path.join(cassette_dir, filename))
 
     # https://github.com/kevin1024/vcrpy/pull/196
     vcr = VCR(
@@ -138,6 +131,7 @@ def stdscr():
             patch('curses.echo'),               \
             patch('curses.flash'),              \
             patch('curses.endwin'),             \
+            patch('curses.newwin'),             \
             patch('curses.noecho'),             \
             patch('curses.cbreak'),             \
             patch('curses.doupdate'),           \
@@ -148,8 +142,8 @@ def stdscr():
             patch('curses.start_color'),        \
             patch('curses.use_default_colors'):
         out = MockStdscr(nlines=40, ncols=80, x=0, y=0)
-        out.getch = mock.Mock(return_value=-1)
         curses.initscr.return_value = out
+        curses.newwin.side_effect = lambda *args: out.derwin(*args)
         curses.color_pair.return_value = 23
         curses.ACS_VLINE = 0
         yield out
@@ -159,12 +153,20 @@ def stdscr():
 def reddit(vcr, request):
 
     cassette_name = '%s.yaml' % request.node.name
+
+    # Clear the cassette before running the test
+    if request.config.option.record_mode == 'once':
+        filename = os.path.join(vcr.cassette_library_dir, cassette_name)
+        if os.path.exists(filename):
+            os.remove(filename)
+
     with vcr.use_cassette(cassette_name):
         with patch('praw.Reddit.get_access_information'):
             reddit = praw.Reddit(user_agent='rtv test suite',
                                  decode_html_entities=False,
                                  disable_update_check=True)
             if request.config.option.record_mode == 'none':
+                # Turn off praw rate limiting when using cassettes
                 reddit.config.api_request_delay = 0
             yield reddit
 
@@ -174,7 +176,8 @@ def terminal(stdscr, config):
 
     term = Terminal(stdscr, ascii=config['ascii'])
 
-    # Disable the addch patch so the mock stdscr will be called consitantly.
+    # Disable the python 3.4 addch patch so that the mock stdscr calls are
+    # always made the same way
     term.addch = lambda window, *args: window.addch(*args)
     yield term
 

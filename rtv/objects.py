@@ -212,13 +212,14 @@ class LoadScreen(object):
         n_rows, n_cols = self._terminal.stdscr.getmaxyx()
         s_row = (n_rows - 3) // 2
         s_col = (n_cols - message_len - 1) // 2
-        window = self._terminal.stdscr.derwin(3, message_len + 2, s_row, s_col)
+        window = curses.newwin(3, message_len + 2, s_row, s_col)
 
         while True:
             for i in range(len(trail) + 1):
                 if not self._is_running:
-                    window.clear()
+                    window.erase()
                     del window
+                    self._terminal.stdscr.touchwin()
                     self._terminal.stdscr.refresh()
                     return
 

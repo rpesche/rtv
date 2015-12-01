@@ -73,38 +73,41 @@ def test_subscription_page(reddit, terminal, config, oauth, refresh_token):
 
     page.draw()
 
-    # Move cursor to the bottom of the page
-    while not curses.flash.called:
-        page.controller.trigger('j')
-    curses.flash.reset_mock()
-    assert page.nav.absolute_index == 52  # 52 total subscriptions
-    assert page.nav.inverted
+    # Test movement
+    with mock.patch.object(page, 'clear_input_queue'):
 
-    # And back to the top
-    for i in range(page.nav.absolute_index):
+        # Move cursor to the bottom of the page
+        while not curses.flash.called:
+            page.controller.trigger('j')
+        curses.flash.reset_mock()
+        assert page.nav.absolute_index == 52  # 52 total subscriptions
+        assert page.nav.inverted
+
+        # And back to the top
+        for i in range(page.nav.absolute_index):
+            page.controller.trigger('k')
+        assert not curses.flash.called
+        assert page.nav.absolute_index == 0
+        assert not page.nav.inverted
+
+        # Can't go up any further
         page.controller.trigger('k')
-    assert not curses.flash.called
-    assert page.nav.absolute_index == 0
-    assert not page.nav.inverted
+        assert curses.flash.called
+        assert page.nav.absolute_index == 0
+        assert not page.nav.inverted
 
-    # Can't go up any further
-    page.controller.trigger('k')
-    assert curses.flash.called
-    assert page.nav.absolute_index == 0
-    assert not page.nav.inverted
+        # All subscriptions should have been loaded, including this one
+        window = terminal.stdscr.subwin.subwin
+        name = 'Python'.encode('utf-8')
+        window.addstr.assert_any_call(1, 1, name)
 
-    # All subscriptions should have been loaded, including this one
-    window = terminal.stdscr.subwin.subwin
-    name = 'Python'.encode('utf-8')
-    window.addstr.assert_any_call(1, 1, name)
+        # Page down should move the last item to the top
+        n = len(page._subwindows)
+        page.controller.trigger('n')
+        assert page.nav.absolute_index == n - 1
 
-    # Page down should move the last item to the top
-    n = len(page._subwindows)
-    page.controller.trigger('n')
-    assert page.nav.absolute_index == n - 1
-
-    # And page up should move back up, but possibly not to the first item
-    page.controller.trigger('m')
+        # And page up should move back up, but possibly not to the first item
+        page.controller.trigger('m')
 
     # Select a subreddit
     page.controller.trigger(curses.KEY_ENTER)

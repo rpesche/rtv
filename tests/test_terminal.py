@@ -59,8 +59,11 @@ def test_terminal_functions(terminal):
     terminal.getch()
     assert terminal.stdscr.getch.called
 
-    terminal.nodelay(1)
-    terminal.stdscr.nodelay.assert_called_with(1)
+    with pytest.raises(RuntimeError):
+        with terminal.no_delay():
+            raise RuntimeError()
+    terminal.stdscr.nodelay.assert_any_call(0)
+    terminal.stdscr.nodelay.assert_any_call(1)
 
     curses.endwin.reset_mock()
     curses.doupdate.reset_mock()

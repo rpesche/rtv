@@ -140,7 +140,8 @@ def test_submission_page(reddit, terminal, config, oauth, refresh_token):
     assert curses.flash.called
 
     # Move down to the first comment
-    page.controller.trigger('j')
+    with mock.patch.object(page, 'clear_input_queue'):
+        page.controller.trigger('j')
 
     # Try to delete the first comment - wrong author
     curses.flash.reset_mock()
@@ -174,7 +175,8 @@ def test_submission_page(reddit, terminal, config, oauth, refresh_token):
         edit.assert_called_with('submission text')
 
     # Move down to the first comment
-    page.controller.trigger('j')
+    with mock.patch.object(page, 'clear_input_queue'):
+        page.controller.trigger('j')
 
     # Spoof the author and edit the comment
     page.content.get(page.nav.absolute_index)['author'] = reddit.user.name
