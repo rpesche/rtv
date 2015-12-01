@@ -9,6 +9,11 @@ import requests
 
 from rtv.objects import Color, Controller, Navigator, curses_session
 
+try:
+    from unittest import mock
+except ImportError:
+    import mock
+
 
 @pytest.mark.parametrize('ascii', [True, False])
 def test_load_screen(terminal, stdscr, ascii):
@@ -76,6 +81,29 @@ def test_load_screen_keyboard_interrupt(terminal, stdscr, ascii):
     assert not terminal.loader._is_running
     assert not terminal.loader._animator.is_alive()
     assert isinstance(terminal.loader.exception, KeyboardInterrupt)
+
+
+@pytest.mark.parametrize('ascii', [True, False])
+def test_load_screen_escape(terminal, stdscr, ascii):
+    terminal.ascii = ascii
+
+    stdscr.getch.return_value = terminal.ESCAPE
+
+    # Pressing escape should trigger an interrupt during the delay section
+    with mock.patch('os.kill') as kill:
+        with terminal.loader():
+            time.sleep(0.1)
+    assert not terminal.loader._is_running
+    assert not terminal.loader._animator.is_alive()
+    assert kill.called
+
+    # As will as during the animation section
+    with mock.patch('os.kill') as kill:
+        with terminal.loader(delay=0):
+            time.sleep(0.1)
+    assert not terminal.loader._is_running
+    assert not terminal.loader._animator.is_alive()
+    assert kill.called
 
 
 @pytest.mark.parametrize('ascii', [True, False])

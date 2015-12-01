@@ -61,7 +61,7 @@ class SubredditPage(Page):
         name = name or self.content.name
 
         query = self.term.prompt_input('Search {0}:'.format(name))
-        if query is None:
+        if not query:
             return
 
         with self.term.loader():
@@ -82,11 +82,10 @@ class SubredditPage(Page):
     def open_submission(self, url=None):
         "Select the current submission to view posts"
 
+        data = {}
         if url is None:
             data = self.content.get(self.nav.absolute_index)
-            url, url_type = data['url_full'], data['url_type']
-        else:
-            url_type = None
+            url = data['permalink']
 
         with self.term.loader():
             page = SubmissionPage(
@@ -96,28 +95,20 @@ class SubredditPage(Page):
 
         page.loop()
 
-        if url_type == 'selfpost':
-            self.config.history.add(url)
+        if data.get('url_type') in ('selfpost', 'x-post'):
+            self.config.history.add(data['url_full'])
 
     @SubredditController.register(curses.KEY_ENTER, Terminal.RETURN, 'o')
     def open_link(self):
         "Open a link with the webbrowser"
 
         data = self.content.get(self.nav.absolute_index)
-        url = data['url_full']
-
-        if data['url_type'] not in ('x-post', 'selfpost'):
-            self.term.open_browser(url)
+        if data['url_type'] in ('x-post', 'selfpost'):
+            # Open links to other posts directly in RTV
+            self.open_submission()
         else:
-            with self.term.loader():
-                page = SubmissionPage(
-                    self.reddit, self.term, self.config, self.oauth, url=url)
-            if self.term.loader.exception:
-                return
-
-            page.loop()
-
-        self.config.history.add(url)
+            self.term.open_browser(data['url_full'])
+            self.config.history.add(data['url_full'])
 
     @SubredditController.register('c')
     @logged_in
@@ -125,14 +116,12 @@ class SubredditPage(Page):
         "Post a new submission to the given subreddit"
 
         # Check that the subreddit can be submitted to
-        subreddit = self.reddit.get_subreddit(self.content.name)
-        sub_name = six.text_type(subreddit).split('/')[2]
-        if '+' in sub_name or sub_name in ('all', 'front', 'me'):
-            self.term.show_notification('Invalid subreddit')
+        name = self.content.name
+        if '+' in name or name in ('/r/all', '/r/front', '/r/me'):
+            self.term.show_notification("Can't post to {0}".format(name))
             return
 
-        submission_info = docs.SUBMISSION_FILE.format(
-            name=subreddit, content='')
+        submission_info = docs.SUBMISSION_FILE.format(name=name, content='')
         text = self.term.open_editor(submission_info)
         if not text or '\n' not in text:
             self.term.show_notification('Aborted')
@@ -140,7 +129,7 @@ class SubredditPage(Page):
 
         title, content = text.split('\n', 1)
         with self.term.loader(message='Posting', delay=0):
-            post = self.reddit.submit(sub_name, title, text=content)
+            submission = self.reddit.submit(name, title, text=content)
             # Give reddit time to process the submission
             time.sleep(2.0)
         if self.term.loader.exception:
@@ -150,7 +139,7 @@ class SubredditPage(Page):
         with self.term.loader():
             page = SubmissionPage(
                 self.reddit, self.term, self.config, self.oauth,
-                submission=post)
+                submission=submission)
         if self.term.loader.exception:
             return
 
@@ -205,7 +194,7 @@ class SubredditPage(Page):
             self.term.add_line(win, ' {created} {comments} '.format(**data))
 
             if data['gold']:
-                text, attr = self.term.gold
+                text, attr = self.term.guilded
                 self.term.add_line(win, text, attr=attr)
 
             if data['nsfw']:

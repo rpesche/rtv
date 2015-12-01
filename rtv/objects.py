@@ -4,6 +4,7 @@ from __future__ import unicode_literals
 import os
 import time
 import curses
+import signal
 import inspect
 import weakref
 import logging
@@ -193,8 +194,6 @@ class LoadScreen(object):
                 if isinstance(e, base):
                     if message:
                         self._terminal.show_notification(message)
-                    else:
-                        self._terminal.show_notification("Stopped", 0.5)
                     break
             else:
                 return  # Re-raise unhandled exceptions
@@ -202,32 +201,54 @@ class LoadScreen(object):
 
     def animate(self, delay, interval, message, trail):
 
-        start = time.time()
-        while (time.time() - start) < delay:
-            if not self._is_running:
-                return
-            time.sleep(0.01)
+        # The animation starts with a configurable delay before drawing on the
+        # screen. This is to prevent very short loading sections from
+        # flickering on the screen before immediately disappearing.
+        with self._terminal.no_delay():
+            start = time.time()
+            while (time.time() - start) < delay:
+                # Pressing escape triggers a keyboard interrupt
+                if self._terminal.getch() == self._terminal.ESCAPE:
+                    os.kill(os.getpid(), signal.SIGINT)
+                    self._is_running = False
 
+                if not self._is_running:
+                    return
+                time.sleep(0.01)
+
+        # Build the notification window
         message_len = len(message) + len(trail)
         n_rows, n_cols = self._terminal.stdscr.getmaxyx()
         s_row = (n_rows - 3) // 2
         s_col = (n_cols - message_len - 1) // 2
         window = curses.newwin(3, message_len + 2, s_row, s_col)
 
-        while True:
-            for i in range(len(trail) + 1):
-                if not self._is_running:
-                    window.erase()
-                    del window
-                    self._terminal.stdscr.touchwin()
-                    self._terminal.stdscr.refresh()
-                    return
+        # Animate the loading prompt until the stopping condition is triggered
+        # when the context manager exits.
+        with self._terminal.no_delay():
+            while True:
+                for i in range(len(trail) + 1):
+                    if not self._is_running:
+                        window.erase()
+                        del window
+                        self._terminal.stdscr.touchwin()
+                        self._terminal.stdscr.refresh()
+                        return
 
-                window.erase()
-                window.border()
-                self._terminal.add_line(window, message + trail[:i], 1, 1)
-                window.refresh()
-                time.sleep(interval)
+                    window.erase()
+                    window.border()
+                    self._terminal.add_line(window, message + trail[:i], 1, 1)
+                    window.refresh()
+
+                    # Break up the designated sleep interval into smaller
+                    # chunks so we can more responsively check for interrupts.
+                    for _ in range(int(interval/0.01)):
+                        # Pressing escape triggers a keyboard interrupt
+                        if self._terminal.getch() == self._terminal.ESCAPE:
+                            os.kill(os.getpid(), signal.SIGINT)
+                            self._is_running = False
+                            break
+                        time.sleep(0.01)
 
 
 class Color(object):

@@ -160,7 +160,7 @@ class SubmissionPage(Page):
             self.term.add_line(win, ' {score} {created} '.format(**data))
 
             if data['gold']:
-                text, attr = self.term.gold
+                text, attr = self.term.guilded
                 self.term.add_line(win, text, attr=attr)
 
         for row, text in enumerate(data['split_body'], start=offset+1):
