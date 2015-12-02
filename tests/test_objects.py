@@ -16,7 +16,7 @@ except ImportError:
 
 
 @pytest.mark.parametrize('ascii', [True, False])
-def test_load_screen(terminal, stdscr, ascii):
+def test_objects_load_screen(terminal, stdscr, ascii):
     terminal.ascii = ascii
 
     # Ensure the thread is properly started/stopped
@@ -30,7 +30,7 @@ def test_load_screen(terminal, stdscr, ascii):
 
 
 @pytest.mark.parametrize('ascii', [True, False])
-def test_load_screen_exception_unhandled(terminal, stdscr, ascii):
+def test_objects_load_screen_exception_unhandled(terminal, stdscr, ascii):
     terminal.ascii = ascii
 
     # Raising an exception should clean up the loader properly
@@ -43,7 +43,7 @@ def test_load_screen_exception_unhandled(terminal, stdscr, ascii):
 
 
 @pytest.mark.parametrize('ascii', [True, False])
-def test_load_screen_exception_handled(terminal, stdscr, ascii):
+def test_objects_load_screen_exception_handled(terminal, stdscr, ascii):
     terminal.ascii = ascii
 
     # Raising a handled exception should get stored on the loaders
@@ -58,7 +58,7 @@ def test_load_screen_exception_handled(terminal, stdscr, ascii):
 
 
 @pytest.mark.parametrize('ascii', [True, False])
-def test_load_screen_exception_not_caught(terminal, stdscr, ascii):
+def test_objects_load_screen_exception_not_caught(terminal, stdscr, ascii):
     terminal.ascii = ascii
 
     with pytest.raises(KeyboardInterrupt):
@@ -71,7 +71,7 @@ def test_load_screen_exception_not_caught(terminal, stdscr, ascii):
 
 
 @pytest.mark.parametrize('ascii', [True, False])
-def test_load_screen_keyboard_interrupt(terminal, stdscr, ascii):
+def test_objects_load_screen_keyboard_interrupt(terminal, stdscr, ascii):
     terminal.ascii = ascii
 
     # Raising a KeyboardInterrupt should be also be stored
@@ -84,7 +84,7 @@ def test_load_screen_keyboard_interrupt(terminal, stdscr, ascii):
 
 
 @pytest.mark.parametrize('ascii', [True, False])
-def test_load_screen_escape(terminal, stdscr, ascii):
+def test_objects_load_screen_escape(terminal, stdscr, ascii):
     terminal.ascii = ascii
 
     stdscr.getch.return_value = terminal.ESCAPE
@@ -107,7 +107,7 @@ def test_load_screen_escape(terminal, stdscr, ascii):
 
 
 @pytest.mark.parametrize('ascii', [True, False])
-def test_load_screen_initial_delay(terminal, stdscr, ascii):
+def test_objects_load_screen_initial_delay(terminal, stdscr, ascii):
     terminal.ascii = ascii
 
     # If we don't reach the initial delay nothing should be drawn
@@ -117,7 +117,7 @@ def test_load_screen_initial_delay(terminal, stdscr, ascii):
 
 
 @pytest.mark.parametrize('ascii', [True, False])
-def test_load_screen_nested(terminal, ascii):
+def test_objects_load_screen_nested(terminal, ascii):
     terminal.ascii = ascii
 
     with terminal.loader(message='Outer'):
@@ -132,7 +132,7 @@ def test_load_screen_nested(terminal, ascii):
 
 
 @pytest.mark.parametrize('ascii', [True, False])
-def test_load_screen_nested_complex(terminal, stdscr, ascii):
+def test_objects_load_screen_nested_complex(terminal, stdscr, ascii):
     terminal.ascii = ascii
 
     with terminal.loader(message='Outer') as outer_loader:
@@ -156,7 +156,7 @@ def test_load_screen_nested_complex(terminal, stdscr, ascii):
     stdscr.subwin.addstr.assert_called_once_with(1, 1, error_message)
 
 
-def test_color(stdscr):
+def test_objects_color(stdscr):
 
     colors = ['RED', 'GREEN', 'YELLOW', 'BLUE', 'MAGENTA', 'CYAN', 'WHITE']
 
@@ -172,7 +172,7 @@ def test_color(stdscr):
         assert getattr(Color, color) == 23
 
 
-def test_curses_session(stdscr):
+def test_objects_curses_session(stdscr):
 
     # Normal setup and cleanup
     with curses_session():
@@ -202,7 +202,7 @@ def test_curses_session(stdscr):
     curses.endwin.reset_mock()
 
 
-def test_controller():
+def test_objects_controller():
 
     class ControllerA(Controller):
         character_map = {}
@@ -246,7 +246,7 @@ def test_controller():
     assert controller_c.trigger('3') is None
 
 
-def test_navigator_properties():
+def test_objects_navigator_properties():
 
     def valid_page_cb(_):
         return
@@ -262,7 +262,7 @@ def test_navigator_properties():
     assert nav.absolute_index == 3
 
 
-def test_navigator_move():
+def test_objects_navigator_move():
 
     def valid_page_cb(index):
         if index < 0 or index > 3:
@@ -316,7 +316,7 @@ def test_navigator_move():
     assert redraw
 
 
-def test_navigator_move_new_submission():
+def test_objects_navigator_move_new_submission():
 
     def valid_page_cb(index):
         if index != -1:
@@ -341,7 +341,7 @@ def test_navigator_move_new_submission():
     assert not redraw
 
 
-def test_navigator_move_submission():
+def test_objects_navigator_move_submission():
 
     def valid_page_cb(index):
         if index < -1 or index > 4:
@@ -391,7 +391,7 @@ def test_navigator_move_submission():
 
 
 @pytest.mark.xfail(reason="Paging is still broken in several edge-cases")
-def test_navigator_move_page():
+def test_objects_navigator_move_page():
 
     def valid_page_cb(index):
         if index < 0 or index > 7:
@@ -424,7 +424,7 @@ def test_navigator_move_page():
     assert redraw
 
 
-def test_navigator_flip():
+def test_objects_navigator_flip():
 
     def valid_page_cb(index):
         if index < 0 or index > 10:

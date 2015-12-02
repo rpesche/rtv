@@ -155,7 +155,7 @@ def test_terminal_add_line(terminal, stdscr, ascii):
 
     # Outside of screen bounds, don't even try to draw the text
     terminal.add_line(stdscr, 'hello', col=79)
-    assert stdscr.addstr.assert_not_called()
+    assert not stdscr.addstr.called
     stdscr.reset_mock()
 
 

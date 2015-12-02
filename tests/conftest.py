@@ -5,16 +5,19 @@ import os
 import curses
 import logging
 from functools import partial
-from six.moves.urllib.parse import urlparse, parse_qs
 
 import praw
 import pytest
 from vcr import VCR
+from six.moves.urllib.parse import urlparse, parse_qs
 
+from rtv.page import Page
+from rtv.oauth import OAuthHelper
 from rtv.config import Config
 from rtv.terminal import Terminal
-from rtv.oauth import OAuthHelper
-from rtv.page import Page
+from rtv.subreddit import SubredditPage
+from rtv.submission import SubmissionPage
+from rtv.subscription import SubscriptionPage
 
 try:
     from unittest import mock
@@ -26,7 +29,7 @@ patch = partial(mock.patch, autospec=True)
 
 # Turn on logging, but disable vcr from spamming
 logging.basicConfig(level=logging.DEBUG)
-for name in ['vcr.stubs', 'vcr.matchers', 'vcr.cassette']:
+for name in ['vcr.matchers', 'vcr.stubs']:
     logging.getLogger(name).disabled = True
 
 
@@ -151,9 +154,7 @@ def stdscr():
 
 @pytest.yield_fixture()
 def reddit(vcr, request):
-
     cassette_name = '%s.yaml' % request.node.name
-
     # Clear the cassette before running the test
     if request.config.option.record_mode == 'once':
         filename = os.path.join(vcr.cassette_library_dir, cassette_name)
@@ -171,17 +172,50 @@ def reddit(vcr, request):
             yield reddit
 
 
-@pytest.yield_fixture()
+@pytest.fixture()
 def terminal(stdscr, config):
-
     term = Terminal(stdscr, ascii=config['ascii'])
-
     # Disable the python 3.4 addch patch so that the mock stdscr calls are
     # always made the same way
     term.addch = lambda window, *args: window.addch(*args)
-    yield term
+    return term
 
 
-@pytest.yield_fixture()
+@pytest.fixture()
 def oauth(reddit, terminal, config):
-    yield OAuthHelper(reddit, terminal, config)
+    return OAuthHelper(reddit, terminal, config)
+
+
+@pytest.fixture()
+def submission_page(reddit, terminal, config, oauth):
+    submission = 'https://www.reddit.com/r/Python/comments/2xmo63'
+
+    with terminal.loader():
+        page = SubmissionPage(reddit, terminal, config, oauth, url=submission)
+    assert terminal.loader.exception is None
+    page.draw()
+    return page
+
+
+@pytest.fixture()
+def subreddit_page(reddit, terminal, config, oauth):
+    subreddit = '/r/python'
+
+    with terminal.loader():
+        page = SubredditPage(reddit, terminal, config, oauth, subreddit)
+    assert not terminal.loader.exception
+    page.draw()
+    return page
+
+
+@pytest.fixture()
+def subscription_page(reddit, terminal, config, oauth, refresh_token):
+    # Must be logged in to view your subscriptions
+    config.refresh_token = refresh_token
+    oauth.authorize()
+
+    with terminal.loader():
+        page = SubscriptionPage(reddit, terminal, config, oauth)
+    assert terminal.loader.exception is None
+    page.draw()
+    return page

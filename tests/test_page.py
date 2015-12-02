@@ -11,7 +11,7 @@ except ImportError:
     import mock
 
 
-def test_logged_in(terminal):
+def test_page_logged_in(terminal):
 
     page = mock.MagicMock()
     page.term = terminal

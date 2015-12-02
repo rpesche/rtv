@@ -80,7 +80,7 @@ def test_config_from_file():
         assert config.config == args
 
 
-def test_refresh_token():
+def test_config_refresh_token():
     "Ensure that the refresh token can be loaded, saved, and removed"
 
     with NamedTemporaryFile(delete=False) as fp:
@@ -119,7 +119,7 @@ def test_refresh_token():
         assert config.refresh_token is None
 
 
-def test_history():
+def test_config_history():
     "Ensure that the history can be loaded and saved"
 
     with NamedTemporaryFile(delete=False) as fp:

@@ -10,14 +10,12 @@ except ImportError:
     import mock
 
 
-def test_subreddit_page_draw(reddit, terminal, config, oauth):
-
+def test_subreddit_page_construct(reddit, terminal, config, oauth):
     window = terminal.stdscr.subwin
 
     with terminal.loader():
         page = SubredditPage(reddit, terminal, config, oauth, '/r/python')
     assert terminal.loader.exception is None
-
     page.draw()
 
     # Title
@@ -37,58 +35,60 @@ def test_subreddit_page_draw(reddit, terminal, config, oauth):
     with terminal.loader():
         page = SubredditPage(reddit, terminal, config, oauth, '/r/python')
     assert terminal.loader.exception is None
-
     page.draw()
 
 
-def test_subreddit_page(reddit, terminal, config, oauth, refresh_token):
-
-    with terminal.loader():
-        page = SubredditPage(reddit, terminal, config, oauth, name='/r/python')
-    assert terminal.loader.exception is None
-
-    page.draw()
+def test_subreddit_refresh(subreddit_page, terminal):
 
     # Refresh the page with default values
-    page.controller.trigger('r')
-    assert page.content.order is None
-    assert page.content.name == '/r/python'
+    subreddit_page.controller.trigger('r')
+    assert subreddit_page.content.order is None
+    assert subreddit_page.content.name == '/r/python'
     assert terminal.loader.exception is None
 
     # Refresh with the order in the name
-    page.refresh_content(name='/r/python/hot', order='ignore')
-    assert page.content.order == 'hot'
-    assert page.content.name == '/r/python'
+    subreddit_page.refresh_content(name='/r/front/hot', order='ignore')
+    assert subreddit_page.content.order == 'hot'
+    assert subreddit_page.content.name == '/r/front'
     assert terminal.loader.exception is None
+
+
+def test_subreddit_search(subreddit_page, terminal):
 
     # Search the current subreddit
     with mock.patch.object(terminal, 'prompt_input'):
         terminal.prompt_input.return_value = 'search term'
-        page.controller.trigger('f')
-        assert page.content.name == '/r/python'
+        subreddit_page.controller.trigger('f')
+        assert subreddit_page.content.name == '/r/python'
         assert terminal.prompt_input.called
         assert not terminal.loader.exception
 
     # Searching with an empty query shouldn't crash
     with mock.patch.object(terminal, 'prompt_input'):
         terminal.prompt_input.return_value = None
-        page.controller.trigger('f')
+        subreddit_page.controller.trigger('f')
         assert not terminal.loader.exception
+
+
+def test_subreddit_prompt(subreddit_page, terminal):
 
     # Prompt for a different subreddit
     with mock.patch.object(terminal, 'prompt_input'):
         terminal.prompt_input.return_value = 'front/top'
-        page.controller.trigger('/')
-        assert page.content.name == '/r/front'
-        assert page.content.order == 'top'
+        subreddit_page.controller.trigger('/')
+        assert subreddit_page.content.name == '/r/front'
+        assert subreddit_page.content.order == 'top'
         assert not terminal.loader.exception
 
+
+def test_subreddit_open(subreddit_page, terminal, config):
+
     # Open the selected submission
-    data = page.content.get(page.nav.absolute_index)
+    data = subreddit_page.content.get(subreddit_page.nav.absolute_index)
     with mock.patch('rtv.submission.SubmissionPage.loop') as loop, \
             mock.patch.object(config.history, 'add'):
         data['url_type'] = 'selfpost'
-        page.controller.trigger('l')
+        subreddit_page.controller.trigger('l')
         assert not terminal.loader.exception
         assert loop.called
         config.history.add.assert_called_with(data['url_full'])
@@ -97,16 +97,19 @@ def test_subreddit_page(reddit, terminal, config, oauth, refresh_token):
     with mock.patch.object(terminal, 'open_browser'), \
             mock.patch.object(config.history, 'add'):
         data['url_type'] = 'external'
-        page.controller.trigger('o')
+        subreddit_page.controller.trigger('o')
         assert terminal.open_browser.called
         config.history.add.assert_called_with(data['url_full'])
 
     # Open the selected link within rtv
-    with mock.patch.object(page, 'open_submission'), \
+    with mock.patch.object(subreddit_page, 'open_submission'), \
             mock.patch.object(config.history, 'add'):
         data['url_type'] = 'selfpost'
-        page.controller.trigger('o')
-        assert page.open_submission.called
+        subreddit_page.controller.trigger('o')
+        assert subreddit_page.open_submission.called
+
+
+def test_subreddit_unauthenticated(subreddit_page, terminal):
 
     # Unauthenticated commands
     methods = [
@@ -118,27 +121,28 @@ def test_subreddit_page(reddit, terminal, config, oauth, refresh_token):
         's',  # Subscriptions
     ]
     for ch in methods:
-        page.controller.trigger(ch)
+        subreddit_page.controller.trigger(ch)
         text = 'Not logged in'.encode('utf-8')
         terminal.stdscr.subwin.addstr.assert_called_with(1, 1, text)
 
-    # Log in
-    config.refresh_token = refresh_token
-    oauth.authorize()
 
-    page.refresh_content('front')
+def test_subreddit_post(subreddit_page, terminal, reddit, refresh_token):
+
+    # Log in
+    subreddit_page.config.refresh_token = refresh_token
+    subreddit_page.oauth.authorize()
 
     # Post a submission to an invalid subreddit
-    page.controller.trigger('c')
+    subreddit_page.refresh_content('front')
+    subreddit_page.controller.trigger('c')
     text = "Can't post to /r/front".encode('utf-8')
     terminal.stdscr.subwin.addstr.assert_called_with(1, 1, text)
 
-    page.refresh_content('python')
-
     # Post a submission with a title but with no body
+    subreddit_page.refresh_content('python')
     with mock.patch.object(terminal, 'open_editor'):
         terminal.open_editor.return_value = 'title'
-        page.controller.trigger('c')
+        subreddit_page.controller.trigger('c')
         text = "Aborted".encode('utf-8')
         terminal.stdscr.subwin.addstr.assert_called_with(1, 1, text)
 
@@ -151,13 +155,18 @@ def test_subreddit_page(reddit, terminal, config, oauth, refresh_token):
             mock.patch('time.sleep'):
         terminal.open_editor.return_value = 'test\ncontent'
         reddit.submit.return_value = submission
-        page.controller.trigger('c')
+        subreddit_page.controller.trigger('c')
         assert reddit.submit.called
         assert loop.called
 
-    # Select a subscription
+
+def test_subreddit_open_subscriptions(subreddit_page, refresh_token):
+
+    # Log in
+    subreddit_page.config.refresh_token = refresh_token
+    subreddit_page.oauth.authorize()
+
+    # Open a subscription
     with mock.patch('rtv.page.Page.loop') as loop:
-        page.controller.trigger('s')
+        subreddit_page.controller.trigger('s')
         assert loop.called
-
-

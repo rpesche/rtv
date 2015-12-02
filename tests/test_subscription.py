@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
-import praw
 import curses
+
+import praw
 
 from rtv.subscription import SubscriptionPage
 
@@ -12,13 +13,20 @@ except ImportError:
     import mock
 
 
-def test_subscription_page_draw(reddit, terminal, config, oauth, refresh_token):
-
+def test_subscription_page_construct(reddit, terminal, config, oauth,
+                                     refresh_token):
     window = terminal.stdscr.subwin
+
+    # Can't load the page if not logged in
+    with terminal.loader():
+        SubscriptionPage(reddit, terminal, config, oauth)
+    assert isinstance(
+        terminal.loader.exception, praw.errors.LoginOrScopeRequired)
 
     # Log in
     config.refresh_token = refresh_token
     oauth.authorize()
+
     with terminal.loader():
         page = SubscriptionPage(reddit, terminal, config, oauth)
     assert terminal.loader.exception is None
@@ -47,79 +55,72 @@ def test_subscription_page_draw(reddit, terminal, config, oauth, refresh_token):
     page.draw()
 
 
-def test_subscription_page(reddit, terminal, config, oauth, refresh_token):
-
-    # Can't load the page if not logged in
-    with terminal.loader():
-        SubscriptionPage(reddit, terminal, config, oauth)
-    assert isinstance(
-        terminal.loader.exception, praw.errors.LoginOrScopeRequired)
-
-    # Log in
-    config.refresh_token = refresh_token
-    oauth.authorize()
-    with terminal.loader():
-        page = SubscriptionPage(reddit, terminal, config, oauth)
-    assert terminal.loader.exception is None
+def test_subscription_refresh(subscription_page):
 
     # Refresh content - invalid order
-    page.controller.trigger('2')
+    subscription_page.controller.trigger('2')
     assert curses.flash.called
     curses.flash.reset_mock()
 
     # Refresh content
-    page.controller.trigger('r')
+    subscription_page.controller.trigger('r')
     assert not curses.flash.called
 
-    page.draw()
+
+def test_subscription_move(subscription_page):
 
     # Test movement
-    with mock.patch.object(page, 'clear_input_queue'):
+    with mock.patch.object(subscription_page, 'clear_input_queue'):
 
         # Move cursor to the bottom of the page
         while not curses.flash.called:
-            page.controller.trigger('j')
+            subscription_page.controller.trigger('j')
         curses.flash.reset_mock()
-        assert page.nav.absolute_index == 52  # 52 total subscriptions
-        assert page.nav.inverted
+        assert subscription_page.nav.inverted
+        assert (subscription_page.nav.absolute_index ==
+                len(subscription_page.content._subscription_data) - 1)
 
         # And back to the top
-        for i in range(page.nav.absolute_index):
-            page.controller.trigger('k')
+        for i in range(subscription_page.nav.absolute_index):
+            subscription_page.controller.trigger('k')
         assert not curses.flash.called
-        assert page.nav.absolute_index == 0
-        assert not page.nav.inverted
+        assert subscription_page.nav.absolute_index == 0
+        assert not subscription_page.nav.inverted
 
         # Can't go up any further
-        page.controller.trigger('k')
+        subscription_page.controller.trigger('k')
         assert curses.flash.called
-        assert page.nav.absolute_index == 0
-        assert not page.nav.inverted
-
-        # All subscriptions should have been loaded, including this one
-        window = terminal.stdscr.subwin.subwin
-        name = 'Python'.encode('utf-8')
-        window.addstr.assert_any_call(1, 1, name)
+        assert subscription_page.nav.absolute_index == 0
+        assert not subscription_page.nav.inverted
 
         # Page down should move the last item to the top
-        n = len(page._subwindows)
-        page.controller.trigger('n')
-        assert page.nav.absolute_index == n - 1
+        n = len(subscription_page._subwindows)
+        subscription_page.controller.trigger('n')
+        assert subscription_page.nav.absolute_index == n - 1
 
         # And page up should move back up, but possibly not to the first item
-        page.controller.trigger('m')
+        subscription_page.controller.trigger('m')
+
+
+def test_subscription_select(subscription_page):
 
     # Select a subreddit
-    page.controller.trigger(curses.KEY_ENTER)
-    assert page.subreddit_data is not None
-    assert page.active is False
+    subscription_page.controller.trigger(curses.KEY_ENTER)
+    assert subscription_page.subreddit_data is not None
+    assert subscription_page.active is False
+
+
+def test_subscription_close(subscription_page):
 
     # Close the subscriptions page
-    page.subreddit_data = None
-    page.active = None
-    page.controller.trigger('h')
-    assert page.subreddit_data is None
-    assert page.active is False
+    subscription_page.subreddit_data = None
+    subscription_page.active = None
+    subscription_page.controller.trigger('h')
+    assert subscription_page.subreddit_data is None
+    assert subscription_page.active is False
+
+
+def test_subscription_page_invalid(subscription_page):
 
     # Test that other commands don't crash
     methods = [
@@ -130,5 +131,5 @@ def test_subscription_page(reddit, terminal, config, oauth, refresh_token):
     ]
     for ch in methods:
         curses.flash.reset_mock()
-        page.controller.trigger(ch)
+        subscription_page.controller.trigger(ch)
         assert curses.flash.called

@@ -11,8 +11,7 @@ except ImportError:
     import mock
 
 
-def test_submission_page_draw(reddit, terminal, config, oauth):
-
+def test_submission_page_construct(reddit, terminal, config, oauth):
     window = terminal.stdscr.subwin
     url = ('https://www.reddit.com/r/Python/comments/2xmo63/'
            'a_python_terminal_viewer_for_browsing_reddit')
@@ -54,23 +53,16 @@ def test_submission_page_draw(reddit, terminal, config, oauth):
     with terminal.loader():
         page = SubmissionPage(reddit, terminal, config, oauth, url=url)
     assert terminal.loader.exception is None
-
     page.draw()
 
 
-def test_submission_page(reddit, terminal, config, oauth, refresh_token):
-
-    url = ('https://www.reddit.com/r/Python/comments/2xmo63/'
-           'a_python_terminal_viewer_for_browsing_reddit')
-
-    with terminal.loader():
-        page = SubmissionPage(reddit, terminal, config, oauth, url=url)
-    assert terminal.loader.exception is None
-
-    page.draw()
+def test_submission_refresh(submission_page):
 
     # Should be able to refresh content
-    page.refresh_content()
+    submission_page.refresh_content()
+
+
+def test_submission_unauthenticated(submission_page, terminal):
 
     # Unauthenticated commands
     methods = [
@@ -81,48 +73,63 @@ def test_submission_page(reddit, terminal, config, oauth, refresh_token):
         'd',  # Delete
     ]
     for ch in methods:
-        page.controller.trigger(ch)
+        submission_page.controller.trigger(ch)
         text = 'Not logged in'.encode('utf-8')
         terminal.stdscr.subwin.addstr.assert_called_with(1, 1, text)
 
-    # Open the selected link
+
+def test_submission_open(submission_page, terminal):
+
+   # Open the selected link with the web browser
     with mock.patch.object(terminal, 'open_browser'):
-        page.controller.trigger(terminal.RETURN)
+        submission_page.controller.trigger(terminal.RETURN)
         assert terminal.open_browser.called
 
+
+def test_submission_vote(submission_page, refresh_token):
+
     # Log in
-    config.refresh_token = refresh_token
-    oauth.authorize()
+    submission_page.config.refresh_token = refresh_token
+    submission_page.oauth.authorize()
 
     # Test voting on the submission
     with mock.patch('praw.objects.Submission.upvote') as upvote,            \
             mock.patch('praw.objects.Submission.downvote') as downvote,     \
             mock.patch('praw.objects.Submission.clear_vote') as clear_vote:
 
+        data = submission_page.content.get(submission_page.nav.absolute_index)
+
         # Upvote
-        page.controller.trigger('a')
+        submission_page.controller.trigger('a')
         assert upvote.called
-        assert page.content.get(page.nav.absolute_index)['likes'] is True
+        assert data['likes'] is True
 
         # Downvote
-        page.controller.trigger('z')
+        submission_page.controller.trigger('z')
         assert downvote.called
-        assert page.content.get(page.nav.absolute_index)['likes'] is False
+        assert data['likes'] is False
 
         # Clear vote
-        page.controller.trigger('z')
+        submission_page.controller.trigger('z')
         assert clear_vote.called
-        assert page.content.get(page.nav.absolute_index)['likes'] is None
+        assert data['likes'] is None
 
         # Upvote - exception
         upvote.side_effect = KeyboardInterrupt()
-        page.controller.trigger('a')
-        assert page.content.get(page.nav.absolute_index)['likes'] is None
+        submission_page.controller.trigger('a')
+        assert data['likes'] is None
 
         # Downvote - exception
         downvote.side_effect = KeyboardInterrupt()
-        page.controller.trigger('a')
-        assert page.content.get(page.nav.absolute_index)['likes'] is None
+        submission_page.controller.trigger('a')
+        assert data['likes'] is None
+
+
+def test_submission_comment(submission_page, terminal, refresh_token):
+
+    # Log in
+    submission_page.config.refresh_token = refresh_token
+    submission_page.oauth.authorize()
 
     # Leave a comment
     with mock.patch('praw.objects.Submission.add_comment') as add_comment, \
@@ -130,61 +137,77 @@ def test_submission_page(reddit, terminal, config, oauth, refresh_token):
             mock.patch('time.sleep'):
         open_editor.return_value = 'comment text'
 
-        page.controller.trigger('c')
+        submission_page.controller.trigger('c')
         assert open_editor.called
         add_comment.assert_called_with('comment text')
 
+
+def test_submission_delete(submission_page, terminal, refresh_token):
+
+    # Log in
+    submission_page.config.refresh_token = refresh_token
+    submission_page.oauth.authorize()
+
     # Can't delete the submission
     curses.flash.reset_mock()
-    page.controller.trigger('d')
+    submission_page.controller.trigger('d')
     assert curses.flash.called
 
     # Move down to the first comment
-    with mock.patch.object(page, 'clear_input_queue'):
-        page.controller.trigger('j')
+    with mock.patch.object(submission_page, 'clear_input_queue'):
+        submission_page.controller.trigger('j')
 
     # Try to delete the first comment - wrong author
     curses.flash.reset_mock()
-    page.controller.trigger('d')
+    submission_page.controller.trigger('d')
     assert curses.flash.called
 
     # Spoof the author and try to delete again
-    page.content.get(page.nav.absolute_index)['author'] = reddit.user.name
+    data = submission_page.content.get(submission_page.nav.absolute_index)
+    data['author'] = submission_page.reddit.user.name
     with mock.patch('praw.objects.Comment.delete') as delete,     \
             mock.patch.object(terminal.stdscr, 'getch') as getch, \
             mock.patch('time.sleep'):
         getch.return_value = ord('y')
-
-        page.controller.trigger('d')
+        submission_page.controller.trigger('d')
         assert delete.called
+
+
+def test_submission_edit(submission_page, terminal, refresh_token):
+
+    # Log in
+    submission_page.config.refresh_token = refresh_token
+    submission_page.oauth.authorize()
 
     # Try to edit the submission - wrong author
     curses.flash.reset_mock()
-    page.controller.trigger('e')
+    submission_page.controller.trigger('e')
     assert curses.flash.called
 
     # Spoof the submission and try to edit again
-    page.content.get(page.nav.absolute_index)['author'] = reddit.user.name
+    data = submission_page.content.get(submission_page.nav.absolute_index)
+    data['author'] = submission_page.reddit.user.name
     with mock.patch('praw.objects.Submission.edit') as edit,           \
             mock.patch.object(terminal, 'open_editor') as open_editor, \
             mock.patch('time.sleep'):
         open_editor.return_value = 'submission text'
 
-        page.controller.trigger('e')
+        submission_page.controller.trigger('e')
         assert open_editor.called
         edit.assert_called_with('submission text')
 
     # Move down to the first comment
-    with mock.patch.object(page, 'clear_input_queue'):
-        page.controller.trigger('j')
+    with mock.patch.object(submission_page, 'clear_input_queue'):
+        submission_page.controller.trigger('j')
 
     # Spoof the author and edit the comment
-    page.content.get(page.nav.absolute_index)['author'] = reddit.user.name
+    data = submission_page.content.get(submission_page.nav.absolute_index)
+    data['author'] = submission_page.reddit.user.name
     with mock.patch('praw.objects.Comment.edit') as edit,              \
             mock.patch.object(terminal, 'open_editor') as open_editor, \
             mock.patch('time.sleep'):
         open_editor.return_value = 'comment text'
 
-        page.controller.trigger('e')
+        submission_page.controller.trigger('e')
         assert open_editor.called
         edit.assert_called_with('comment text')

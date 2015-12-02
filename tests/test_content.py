@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
-import six
 import time
-import praw
 from itertools import islice
 
+import six
+import praw
 import pytest
 
 from rtv.content import (
@@ -18,7 +18,7 @@ except ImportError:
     import mock
 
 
-def test_humanize_timestamp():
+def test_content_humanize_timestamp():
 
     timestamp = time.time() - 30
     assert Content.humanize_timestamp(timestamp) == '0min'
@@ -33,7 +33,7 @@ def test_humanize_timestamp():
     assert Content.humanize_timestamp(timestamp, True) == '5 years ago'
 
 
-def test_wrap_text():
+def test_content_wrap_text():
 
     text = 'four score\nand seven\n\n'
     assert Content.wrap_text(text, 6) == ['four', 'score', 'and', 'seven', '']
@@ -42,7 +42,7 @@ def test_wrap_text():
     assert Content.wrap_text('\n\n\n\n', 70) == ['', '', '', '']
 
 
-def test_submission_content_initialize(reddit, terminal):
+def test_content_submission_initialize(reddit, terminal):
 
     url = 'https://www.reddit.com/r/Python/comments/2xmo63/'
     submission = reddit.get_submission(url)
@@ -54,7 +54,7 @@ def test_submission_content_initialize(reddit, terminal):
     assert content.name is not None
 
 
-def test_submission_content(reddit, terminal):
+def test_content_submission(reddit, terminal):
 
     url = 'https://www.reddit.com/r/Python/comments/2xmo63/'
     submission = reddit.get_submission(url)
@@ -94,7 +94,7 @@ def test_submission_content(reddit, terminal):
     assert len(content._comment_data) == 45
 
 
-def test_submission_content_load_more_comments(reddit, terminal):
+def test_content_submission_load_more_comments(reddit, terminal):
 
     url = 'https://www.reddit.com/r/AskReddit/comments/2np694/'
     submission = reddit.get_submission(url)
@@ -108,7 +108,7 @@ def test_submission_content_load_more_comments(reddit, terminal):
     assert content.get(390)['type'] == 'Comment'
 
 
-def test_submission_content_from_url(reddit, terminal):
+def test_content_submission_from_url(reddit, terminal):
 
     url = 'https://www.reddit.com/r/AskReddit/comments/2np694/'
     SubmissionContent.from_url(reddit, url, terminal.loader)
@@ -125,7 +125,7 @@ def test_submission_content_from_url(reddit, terminal):
     assert isinstance(terminal.loader.exception, praw.errors.NotFound)
 
 
-def test_subreddit_content_initialize(reddit, terminal):
+def test_content_subreddit_initialize(reddit, terminal):
 
     submissions = reddit.get_subreddit('python').get_top(limit=None)
     content = SubredditContent('python', submissions, terminal.loader, 'top')
@@ -134,7 +134,7 @@ def test_subreddit_content_initialize(reddit, terminal):
     assert len(content._submission_data) == 1
 
 
-def test_subreddit_content_initialize_invalid(reddit, terminal):
+def test_content_subreddit_initialize_invalid(reddit, terminal):
 
     submissions = reddit.get_subreddit('invalidsubreddit7').get_top(limit=None)
     with terminal.loader():
@@ -142,7 +142,7 @@ def test_subreddit_content_initialize_invalid(reddit, terminal):
     assert isinstance(terminal.loader.exception, praw.errors.InvalidSubreddit)
 
 
-def test_subreddit_content(reddit, terminal):
+def test_content_subreddit(reddit, terminal):
 
     submissions = reddit.get_front_page(limit=5)
     content = SubredditContent('front', submissions, terminal.loader)
@@ -165,7 +165,7 @@ def test_subreddit_content(reddit, terminal):
         content.get(5)
 
 
-def test_subreddit_content_load_more(reddit, terminal):
+def test_content_subreddit_load_more(reddit, terminal):
 
     submissions = reddit.get_front_page(limit=None)
     content = SubredditContent('front', submissions, terminal.loader)
@@ -181,7 +181,7 @@ def test_subreddit_content_load_more(reddit, terminal):
             assert not isinstance(val, six.binary_type)
 
 
-def test_subreddit_content_from_name(reddit, terminal):
+def test_content_subreddit_from_name(reddit, terminal):
 
     name = '/r/python'
     content = SubredditContent.from_name(reddit, name, terminal.loader)
@@ -218,7 +218,7 @@ def test_subreddit_content_from_name(reddit, terminal):
     SubredditContent.from_name(reddit, 'python', terminal.loader, query='pea')
 
 
-def test_subreddit_content_multireddit(reddit, terminal):
+def test_content_subreddit_multireddit(reddit, terminal):
 
     name = '/r/python+linux'
     content = SubredditContent.from_name(reddit, name, terminal.loader)
@@ -231,7 +231,7 @@ def test_subreddit_content_multireddit(reddit, terminal):
     assert isinstance(terminal.loader.exception, praw.errors.NotFound)
 
 
-def test_subreddit_content_me(reddit, oauth, refresh_token, terminal):
+def test_content_subreddit_me(reddit, oauth, refresh_token, terminal):
 
     # Not logged in
     with terminal.loader():
@@ -249,7 +249,7 @@ def test_subreddit_content_me(reddit, oauth, refresh_token, terminal):
         assert isinstance(terminal.loader.exception, exceptions.SubredditError)
 
 
-def test_subscription_content(reddit, oauth, refresh_token, terminal):
+def test_content_subscription(reddit, oauth, refresh_token, terminal):
 
     # Not logged in
     with terminal.loader():
@@ -277,7 +277,7 @@ def test_subscription_content(reddit, oauth, refresh_token, terminal):
             assert not isinstance(val, six.binary_type)
 
 
-def test_subscription_content_empty(terminal):
+def test_content_subscription_empty(terminal):
 
     # Simulate an empty subscription generator
     subscriptions = iter([])

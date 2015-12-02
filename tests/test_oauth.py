@@ -11,7 +11,7 @@ except ImportError:
     import mock
 
 
-def test_terminal_non_mobile_authorize(reddit, terminal, config):
+def test_oauth_terminal_non_mobile_authorize(reddit, terminal, config):
 
     # Should direct to the desktop version if using a graphical browser
     terminal._display = True
@@ -19,7 +19,7 @@ def test_terminal_non_mobile_authorize(reddit, terminal, config):
     assert '.compact' not in oauth.reddit.config.API_PATHS['authorize']
 
 
-def test_terminal_mobile_authorize(reddit, terminal, config):
+def test_oauth_terminal_mobile_authorize(reddit, terminal, config):
 
     # Should direct to the mobile version if using a terminal browser
     terminal._display = False
@@ -27,7 +27,7 @@ def test_terminal_mobile_authorize(reddit, terminal, config):
     assert '.compact' in oauth.reddit.config.API_PATHS['authorize']
 
 
-def test_authorize_with_refresh_token(oauth, stdscr, refresh_token):
+def test_oauth_authorize_with_refresh_token(oauth, stdscr, refresh_token):
 
     oauth.config.refresh_token = refresh_token
     oauth.authorize()
@@ -43,7 +43,7 @@ def test_authorize_with_refresh_token(oauth, stdscr, refresh_token):
     assert oauth.http_server is None
 
 
-def test_authorize(oauth, reddit, stdscr, refresh_token):
+def test_oauth_authorize(oauth, reddit, stdscr, refresh_token):
 
     # Because we use `from .helpers import open_browser` we have to patch the
     # function in the destination oauth module and not the helpers module
@@ -114,7 +114,7 @@ def test_authorize(oauth, reddit, stdscr, refresh_token):
         stdscr.derwin().addstr.assert_called_with(1, 1, message)
         assert not oauth.config.save_refresh_token.called
 
-def test_clear_oauth_data(oauth):
+def test_oauth_clear_data(oauth):
 
     oauth.config.refresh_token = 'secrettoken'
     oauth.reddit.refresh_token = 'secrettoken'
