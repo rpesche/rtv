@@ -25,7 +25,8 @@ def test_page_logged_in(terminal):
     with pytest.raises(RuntimeError):
         func(page)
     message = 'Not logged in'.encode('utf-8')
-    terminal.stdscr.subwin.addstr.assert_not_called_with(1, 1, message)
+    with pytest.raises(AssertionError):
+        terminal.stdscr.subwin.addstr.assert_called_with(1, 1, message)
 
     # Logged out skips the function and displays a message
     page.reddit.is_oauth_session.return_value = False

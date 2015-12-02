@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
+import os
+
 from praw.errors import OAuthException
 
 from rtv.oauth import OAuthHelper
@@ -11,9 +13,16 @@ except ImportError:
     import mock
 
 
+def test_oauth_html_template(config):
+
+    # The html template should be included when the project is packaged
+    assert os.path.exists(os.path.join(config['template_path'], 'index.html'))
+
+
 def test_oauth_terminal_non_mobile_authorize(reddit, terminal, config):
 
     # Should direct to the desktop version if using a graphical browser
+    reddit.config.API_PATHS['authorize'] = 'api/v1/authorize/'
     terminal._display = True
     oauth = OAuthHelper(reddit, terminal, config)
     assert '.compact' not in oauth.reddit.config.API_PATHS['authorize']
@@ -22,6 +31,7 @@ def test_oauth_terminal_non_mobile_authorize(reddit, terminal, config):
 def test_oauth_terminal_mobile_authorize(reddit, terminal, config):
 
     # Should direct to the mobile version if using a terminal browser
+    reddit.config.API_PATHS['authorize'] = 'api/v1/authorize/'
     terminal._display = False
     oauth = OAuthHelper(reddit, terminal, config)
     assert '.compact' in oauth.reddit.config.API_PATHS['authorize']
