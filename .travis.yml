@@ -5,11 +5,11 @@ python:
   - "3.4"
   - "3.5"
 before_install:
-  - pip install coveralls pytest pytest-cov mock
+  - pip install coveralls pytest coverage mock
   - pip install git+https://github.com/kevin1024/vcrpy.git
 install:
   - pip install .
 script:
-    - py.test --cov rtv --cov-report term-missing
+  - coverage run -m py.test -v
 after_success:
   - coveralls
