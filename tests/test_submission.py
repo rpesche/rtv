@@ -115,12 +115,12 @@ def test_submission_vote(submission_page, refresh_token):
         assert data['likes'] is None
 
         # Upvote - exception
-        upvote.side_effect = KeyboardInterrupt()
+        upvote.side_effect = KeyboardInterrupt
         submission_page.controller.trigger('a')
         assert data['likes'] is None
 
         # Downvote - exception
-        downvote.side_effect = KeyboardInterrupt()
+        downvote.side_effect = KeyboardInterrupt
         submission_page.controller.trigger('a')
         assert data['likes'] is None
 

@@ -192,7 +192,7 @@ def test_objects_curses_session(stdscr):
     curses.endwin.reset_mock()
 
     # But cleanup shouldn't run if stdscr was never instantiated
-    curses.initscr.side_effect = KeyboardInterrupt()
+    curses.initscr.side_effect = KeyboardInterrupt
     with pytest.raises(KeyboardInterrupt):
         with curses_session():
             pass
