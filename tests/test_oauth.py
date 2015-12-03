@@ -3,9 +3,12 @@ from __future__ import unicode_literals
 
 import os
 
+from tornado.web import Application
+from tornado.testing import AsyncHTTPTestCase
 from praw.errors import OAuthException
 
-from rtv.oauth import OAuthHelper
+from rtv.oauth import OAuthHelper, OAuthHandler
+from rtv.config import TEMPLATE
 
 try:
     from unittest import mock
@@ -13,10 +16,38 @@ except ImportError:
     import mock
 
 
-def test_oauth_html_template(config):
+class TestAuthHandler(AsyncHTTPTestCase):
 
-    # The html template should be included when the project is packaged
-    assert os.path.exists(os.path.join(config['template_path'], 'index.html'))
+    def get_app(self):
+        self.params = {}
+        handler = [('/', OAuthHandler, {'params': self.params})]
+        return Application(handler, template_path=TEMPLATE)
+
+    def test_no_callback(self):
+        resp = self.fetch('/')
+        assert resp.code == 200
+        assert self.params['error'] is None
+        assert 'Wait...' in resp.body.decode()
+
+    def test_access_denied(self):
+        resp = self.fetch('/?error=access_denied')
+        assert resp.code == 200
+        assert self.params['error'] == 'access_denied'
+        assert 'was denied access' in resp.body.decode()
+
+    def test_error(self):
+        resp = self.fetch('/?error=fake')
+        assert resp.code == 200
+        assert self.params['error'] == 'fake'
+        assert 'Error : fake' in resp.body.decode()
+
+    def test_success(self):
+        resp = self.fetch('/?state=fake_state&code=fake_code')
+        assert resp.code == 200
+        assert self.params['error'] is None
+        assert self.params['state'] == 'fake_state'
+        assert self.params['code'] == 'fake_code'
+        assert 'Access Granted' in resp.body.decode()
 
 
 def test_oauth_terminal_non_mobile_authorize(reddit, terminal, config):
