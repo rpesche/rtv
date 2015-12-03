@@ -31,9 +31,11 @@ class OAuthHandler(web.RequestHandler):
 
         self.render('index.html', **self.params)
 
-        # Stop IOLoop if using a background browser such as firefox
-        if self.display:
-            ioloop.IOLoop.current().stop()
+        complete = self.params['state'] and self.params['code']
+        if complete or self.params['error']:
+            # Stop IOLoop if using a background browser such as firefox
+            if self.display:
+                ioloop.IOLoop.current().stop()
 
 
 class OAuthHelper(object):
@@ -95,6 +97,7 @@ class OAuthHelper(object):
                 self.term.open_browser(authorize_url)
                 io.start()
             if self.term.loader.exception:
+                io.clear_instance()
                 return
         else:
             # Open the terminal webbrowser in a background thread and wait
@@ -107,10 +110,7 @@ class OAuthHelper(object):
             io.add_callback(self._async_open_browser, authorize_url)
             io.start()
 
-        if not self.params['code']:
-            self.term.show_notification('Missing code')
-            return
-        elif self.params['error'] == 'access_denied':
+        if self.params['error'] == 'access_denied':
             self.term.show_notification('Declined access')
             return
         elif self.params['error']:

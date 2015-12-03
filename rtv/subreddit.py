@@ -121,7 +121,7 @@ class SubredditPage(Page):
             self.term.show_notification("Can't post to {0}".format(name))
             return
 
-        submission_info = docs.SUBMISSION_FILE.format(name=name, content='')
+        submission_info = docs.SUBMISSION_FILE.format(name=name)
         text = self.term.open_editor(submission_info)
         if not text or '\n' not in text:
             self.term.show_notification('Aborted')
@@ -163,7 +163,8 @@ class SubredditPage(Page):
         # When the user has chosen a subreddit in the subscriptions list,
         # refresh content with the selected subreddit
         if page.subreddit_data is not None:
-            self.refresh_content(name=page.subreddit_data['name'])
+            self.refresh_content(name=page.subreddit_data['name'],
+                                 order='ignore')
 
     def _draw_item(self, win, data, inverted=False):
 

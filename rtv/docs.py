@@ -1,9 +1,6 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
-__all__ = ['AGENT', 'SUMMARY', 'CONTROLS', 'HELP', 'COMMENT_FILE',
-           'SUBMISSION_FILE', 'COMMENT_EDIT_FILE']
-
 AGENT = """\
 desktop:https://github.com/michael-lazar/rtv:{version}\
 (by /u/civilization_phaze_3)\
@@ -52,11 +49,12 @@ Submission Mode
   `SPACE`             : Fold the selected comment, or load additional comments
 """
 
-COMMENT_FILE = """{content}
+COMMENT_FILE = """
 # Please enter a comment. Lines starting with '#' will be ignored,
 # and an empty message aborts the comment.
 #
 # Replying to {author}'s {type}
+{content}
 """
 
 COMMENT_EDIT_FILE = """{content}
@@ -66,12 +64,19 @@ COMMENT_EDIT_FILE = """{content}
 # Editing your comment
 """
 
-SUBMISSION_FILE = """{content}
+SUBMISSION_FILE = """
 # Please enter your submission. Lines starting with '#' will be ignored,
-# and an empty field aborts the submission.
+# and an empty message aborts the submission.
 #
 # The first line will be interpreted as the title
 # The following lines will be interpreted as the content
 #
 # Posting to {name}
+"""
+
+SUBMISSION_EDIT_FILE = """{content}
+# Please enter your submission. Lines starting with '#' will be ignored,
+# and an empty message aborts the submission.
+#
+# Editing {name}
 """

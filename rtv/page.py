@@ -210,7 +210,8 @@ class Page(object):
         if data['type'] == 'Submission':
             subreddit = self.reddit.get_subreddit(self.content.name)
             content = data['text']
-            info = docs.SUBMISSION_FILE.format(content=content, name=subreddit)
+            info = docs.SUBMISSION_EDIT_FILE.format(
+                content=content, name=subreddit)
         elif data['type'] == 'Comment':
             content = data['body']
             info = docs.COMMENT_EDIT_FILE.format(content=content)

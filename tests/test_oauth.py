@@ -39,7 +39,7 @@ class TestAuthHandler(AsyncHTTPTestCase):
         resp = self.fetch('/?error=fake')
         assert resp.code == 200
         assert self.params['error'] == 'fake'
-        assert 'Error : fake' in resp.body.decode()
+        assert 'fake' in resp.body.decode()
 
     def test_success(self):
         resp = self.fetch('/?state=fake_state&code=fake_code')
