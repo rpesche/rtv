@@ -147,7 +147,7 @@ class Content(object):
             data['url_type'] = 'x-post'
             # Strip the subreddit name from the permalink to avoid having
             # submission.subreddit.url make a separate API call
-            data['url'] = 'self.{}'.format(url_full.split('/')[4][3:])
+            data['url'] = 'self.{}'.format(url_full.split('/')[4])
         else:
             data['url_type'] = 'external'
             data['url'] = url_full
