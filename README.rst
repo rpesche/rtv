@@ -67,13 +67,13 @@ Move **right** to view the selected submission, and **left** to exit the submiss
 Basic Commands
 --------------
 
-:``j``/``k`` or ``▲``/``▼``: Move the cursor up/down
-:``m``/``n`` or ``PgUp``/``PgDn``: Jump to the previous/next page
-:``1-5``: Toggle post order (*hot*, *top*, *rising*, *new*, *controversial*)
-:``r`` or ``F5``: Refresh page content
-:``u``: Log in or switch accounts
-:``?``: Show the help screen
-:``q``/``Q``: Quit/Force quit
+:``j``/``k`` or ``▲``/``▼``: Move the cursor up/down: plop
+:``m``/``n`` or ``PgUp``/``PgDn``: Jump to the previous/next page: plop
+:``1-5``: Toggle post order (*hot*, *top*, *rising*, *new*, *controversial*): plop
+:``r`` or ``F5``: Refresh page content: plop
+:``u``: Log in or switch accounts: plop
+:``?``: Show the help screen: plop
+:``q``/``Q``: Quit/Force quit: plop
 
 ----------------------
 Authenticated Commands
